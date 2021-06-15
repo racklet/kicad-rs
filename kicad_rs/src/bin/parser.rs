@@ -1,12 +1,11 @@
-// Import types.rs
-mod types;
-use types::*;
-
-use kicad_parse_gen::schematic as kicad_schematic;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 use std::{env, fmt};
+
+use kicad_parse_gen::schematic as kicad_schematic;
+
+use kicad_rs::types::*;
 
 // Main function, can return different kinds of errors
 fn main() -> Result<(), Box<dyn Error>> {
@@ -15,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sch = parse_schematic(&p, String::new())?;
 
     // Marshal as YAML
-    // First use the JSON parser to convert the struct into an "intermediate representation": a Serde::Value
+    // First use the JSON bin.parser to convert the struct into an "intermediate representation": a Serde::Value
     let json_val = serde_json::to_value(&sch)?;
     // Then, marshal the intermediate representation to YAML, avoiding errors like https://github.com/dtolnay/serde-yaml/issues/87
     let serialized = serde_yaml::to_string(&json_val)?;

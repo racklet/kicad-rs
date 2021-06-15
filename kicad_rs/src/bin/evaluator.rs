@@ -3,9 +3,12 @@ use std::env;
 use std::error::Error;
 use std::path::Path;
 
-mod resolver;
 use evalexpr::Context;
-use resolver::Expression;
+
+use kicad_rs::resolver;
+use kicad_rs::resolver::*;
+
+// use crate::resolver;
 
 // Main function, can return different kinds of errors
 fn main() -> Result<(), Box<dyn Error>> {
