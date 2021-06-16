@@ -96,8 +96,9 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
                 continue;
             };
 
-            // The unit value can be found from the main key + the "_unit" suffix
+            // The unit & comment values can be found from the main key + the "_unit"/"_comment" suffixes
             let unit_key = main_key.to_owned() + "_unit";
+            let comment_key = main_key.to_owned() + "_comment";
 
             // Create a new attribute with the given parameters
             c.attributes.push(Attribute {
@@ -105,14 +106,17 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
                 name: if main_key == "value" {
                     String::new()
                 } else {
-                    main_key.to_owned()
+                    m.get(main_key)
+                        .map(|s| s.as_str()).unwrap_or(main_key) // TODO: Instead of defaulting to main_key, fallback to f.name - the expr suffix
+                        .to_owned()
                 },
                 // Get the main key value. It is ok if it's empty, too.
                 value: get_component_attr_mapped(&comp, main_key, &m).or_empty_str(),
                 // As this field corresponds to the main key expression attribute, we can get the expression directly
                 expression: f.value.clone(),
-                // Optionally, get the unit
+                // Optionally, get the unit and a comment
                 unit: get_component_attr_mapped(&comp, &unit_key, &m),
+                comment: get_component_attr_mapped(&comp, &comment_key, &m),
             });
         }
 
@@ -202,6 +206,7 @@ fn parse_globals_into(kisch: &kicad_schematic::Schematic, globals: &mut Vec<Attr
                 value: String::new(),
                 expression: expr.to_owned(),
                 unit,
+                comment: None,
             })
         }
     }
