@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::iter::FromIterator;
 
 // These types are used to structure the YAML-formatted output
 
@@ -46,6 +48,19 @@ pub struct SchematicMeta {
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct Component {
+    pub labels: ComponentLabels,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub classes: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub attributes: Vec<Attribute>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct ComponentLabels {
     pub reference: String,
     pub footprint_name: String,
     pub footprint_library: String,
@@ -57,9 +72,21 @@ pub struct Component {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub datasheet: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default)]
-    pub attributes: Vec<Attribute>,
+    pub extra: HashMap<String, String>,
+}
+
+impl ComponentLabels {
+    pub fn to_map(&self) -> HashMap<&str, &str> {
+        let mut m = HashMap::from_iter(self.extra.iter().map(|s| (s.0.as_str(), s.1.as_str())));
+        m.insert("reference", self.reference.as_str());
+        m.insert("footprintLibrary", self.footprint_library.as_str());
+        m.insert("footprintName", self.footprint_name.as_str());
+        m.insert("symbolLibrary", self.symbol_library.as_str());
+        m.insert("symbolName", self.symbol_name.as_str());
+        m
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
