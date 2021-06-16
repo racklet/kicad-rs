@@ -5,7 +5,7 @@ use std::io;
 use crate::error::DynamicResult;
 
 // marshal_yaml marshals a serializable value to a YAML string using Serde, but
-// avoiding https://github.com/dtolnay/serde-yaml/issues/87.
+// avoiding https://github.com/dtolnay/serde-yaml/issues/87
 pub fn marshal_yaml<T, W>(data: T, writer: W) -> DynamicResult<()>
 where
     T: Serialize,
@@ -19,7 +19,7 @@ where
     Ok(())
 }
 
-// unmarshal_yaml is the reverse operation of marshal_yaml.
+// unmarshal_yaml is the reverse operation of marshal_yaml
 pub fn unmarshal_yaml<R, T>(reader: R) -> serde_yaml::Result<T>
 where
     R: io::Read,

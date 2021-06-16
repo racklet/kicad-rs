@@ -69,7 +69,7 @@ fn classify_component(comp: &Component, classifiers: &Vec<ComponentClassifier>) 
         .collect();
 
     // As there might be many classifiers of the same name that have matched with a component,
-    // filter all duplicates.
+    // filter all duplicates
     filter_duplicates(&matched_classes)
 }
 

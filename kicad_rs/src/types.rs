@@ -106,7 +106,7 @@ pub struct Attribute {
     pub comment: Option<String>,
 }
 
-// A vector of Attributes implement the Labels trait
+// A vector of Attributes implements the Labels trait
 impl Labels for Vec<Attribute> {
     fn get_label(&self, key: &str) -> Option<&str> {
         self.iter()
