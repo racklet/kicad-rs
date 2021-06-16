@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::path::Path;
 use std::fmt;
+use std::path::Path;
 
 use kicad_parse_gen::schematic as kicad_schematic;
 
@@ -110,7 +110,8 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
                     String::new()
                 } else {
                     m.get(main_key)
-                        .map(|s| s.as_str()).unwrap_or(main_key) // TODO: Instead of defaulting to main_key, fallback to f.name - the expr suffix
+                        .map(|s| s.as_str())
+                        .unwrap_or(main_key) // TODO: Instead of defaulting to main_key, fallback to f.name - the expr suffix
                         .to_owned()
                 },
                 // Get the main key value. It is ok if it's empty, too.
@@ -125,11 +126,9 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
 
         // Only register to the list if it has any expressions, or if it has iccc_show = true set
         if c.attributes.len() > 0
-            || get_component_attr_mapped(
-                &comp,
-                "iccc_show",
-                &m,
-            ).or_empty_str().is_true_like()
+            || get_component_attr_mapped(&comp, "iccc_show", &m)
+                .or_empty_str()
+                .is_true_like()
         {
             // Validate that required fields aren't empty
             let mut req_fields = HashMap::new();

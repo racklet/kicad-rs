@@ -1,8 +1,8 @@
-use std::error::Error;
-use std::path::Path;
-use std::env;
 use kicad_rs::codec;
 use kicad_rs::types::*;
+use std::env;
+use std::error::Error;
+use std::path::Path;
 
 // Main function, can return different kinds of errors
 fn main() -> Result<(), Box<dyn Error>> {

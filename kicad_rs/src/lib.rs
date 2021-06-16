@@ -1,4 +1,4 @@
+pub mod codec;
+pub mod parser;
 pub mod resolver;
 pub mod types;
-pub mod parser;
-pub mod codec;
