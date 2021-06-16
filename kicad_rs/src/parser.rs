@@ -8,8 +8,6 @@ use kicad_parse_gen::schematic as kicad_schematic;
 use crate::types::*;
 
 impl Schematic {
-    // type Result = Result<Schematic, Box<dyn Error>>;
-
     pub fn parse(p: &Path) -> Result<Schematic, Box<dyn Error>> {
         parse_schematic(p, String::new())
     }
@@ -130,7 +128,7 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
                 .or_empty_str()
                 .is_true_like()
         {
-            // Validate that required fields aren't empty
+            // Collect required fields
             let mut req_fields = HashMap::new();
             req_fields.insert("reference", &c.reference);
             req_fields.insert("footprint_library", &c.footprint_library);
