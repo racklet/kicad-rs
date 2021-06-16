@@ -1,22 +1,18 @@
+use kicad_parse_gen::schematic as kicad_schematic;
 use std::collections::HashMap;
-use std::error::Error;
 use std::path::Path;
 
-use kicad_parse_gen::schematic as kicad_schematic;
-
-use crate::error::errorf;
+use crate::error::{errorf, DynamicResult};
 use crate::types::*;
 
-type ParseResult<T> = Result<T, Box<dyn Error>>;
-
 impl Schematic {
-    pub fn parse(p: &Path) -> ParseResult<Schematic> {
+    pub fn parse(p: &Path) -> DynamicResult<Schematic> {
         parse_schematic(p, String::new())
     }
 }
 
 /// Turns a KiCad schematic at `path` into a recursive Schematic struct
-fn parse_schematic(path: &Path, id: String) -> ParseResult<Schematic> {
+fn parse_schematic(path: &Path, id: String) -> DynamicResult<Schematic> {
     // Read the schematic using kicad_parse_gen
     let kisch = kicad_parse_gen::read_schematic(path)?;
 
@@ -37,7 +33,7 @@ fn parse_schematic(path: &Path, id: String) -> ParseResult<Schematic> {
 }
 
 /// Parses the metadata from the given KiCad schematic
-pub fn parse_meta(kisch: &kicad_schematic::Schematic, path: &Path) -> ParseResult<SchematicMeta> {
+pub fn parse_meta(kisch: &kicad_schematic::Schematic, path: &Path) -> DynamicResult<SchematicMeta> {
     // Only include non-empty comments
     let comments = vec![
         kisch.description.comment1.as_str(),
@@ -64,7 +60,7 @@ pub fn parse_meta(kisch: &kicad_schematic::Schematic, path: &Path) -> ParseResul
 }
 
 /// Parses global definitions from text notes in the KiCad schematic
-pub fn parse_globals(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Attribute>> {
+pub fn parse_globals(kisch: &kicad_schematic::Schematic) -> DynamicResult<Vec<Attribute>> {
     let mut globals = Vec::new();
 
     // Loop through the elements of the schematic, which includes text notes as well
@@ -120,7 +116,7 @@ pub fn parse_globals(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Attr
 }
 
 /// Parses the component definitions present in the given KiCad schematic
-pub fn parse_components(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Component>> {
+pub fn parse_components(kisch: &kicad_schematic::Schematic) -> DynamicResult<Vec<Component>> {
     let mut components = Vec::new();
 
     // Walk through all components in the sheet
@@ -236,7 +232,7 @@ pub fn parse_components(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<C
 pub fn parse_sub_schematics(
     kisch: &kicad_schematic::Schematic,
     path: &Path,
-) -> ParseResult<Vec<Schematic>> {
+) -> DynamicResult<Vec<Schematic>> {
     let mut sub_schematics = Vec::new();
 
     // Recursively traverse and parse the sub-schematics

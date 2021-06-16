@@ -1,6 +1,9 @@
 use std::error::Error;
 use std::fmt;
 
+// A result that can carry any Error implementation
+pub type DynamicResult<T> = Result<T, Box<dyn Error>>;
+
 // A struct implementing the Error trait, carrying just a simple message
 #[derive(Debug)]
 pub struct StringError {

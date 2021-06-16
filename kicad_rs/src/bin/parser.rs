@@ -1,18 +1,23 @@
 use kicad_rs::codec;
+use kicad_rs::error::DynamicResult;
 use kicad_rs::types::*;
 use std::env;
-use std::error::Error;
+use std::io;
 use std::path::Path;
 
 // Main function, can return different kinds of errors
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> DynamicResult<()> {
+    // Read the first argument as the path to the .sch file
     let args: Vec<String> = env::args().collect();
-    let p = Path::new(args.get(1).ok_or("expected file as first argument")?);
+    let p = Path::new(
+        args.get(1)
+            .ok_or("expected KiCad schematic file as first argument")?,
+    );
+
+    // Parse the schematic file
     let sch = Schematic::parse(&p)?;
 
     // Marshal as YAML
-    let serialized = codec::marshal_yaml(&sch)?;
-    println!("{}", serialized);
-
+    codec::marshal_yaml(&sch, io::stdout())?;
     Ok(())
 }
