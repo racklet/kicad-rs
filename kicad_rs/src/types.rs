@@ -36,8 +36,10 @@ pub struct SchematicMeta {
 #[serde(rename_all = "camelCase")]
 pub struct Component {
     pub reference: String,
-    pub package: String,
-    pub category: String,
+    pub footprint_name: String,
+    pub footprint_library: String,
+    pub symbol_name: String,
+    pub symbol_library: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

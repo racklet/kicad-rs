@@ -55,13 +55,16 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
         }
 
         let footprint_str = get_component_attr(&comp, "Footprint");
+        let symbol_str = comp.name.as_str();
 
         // Fill in the metadata about the component. Reference and package fields are validated to be non-empty
         // later, once we know if the component should be included in the result.
         let mut c = Component {
             reference: comp.reference.clone(),
-            package: footprint_str.split_char_n(':', 0).or_empty_str(),
-            category: comp.name.to_owned(),
+            footprint_library: footprint_str.split_char_n(':', 0).or_empty_str(),
+            footprint_name: footprint_str.split_char_n(':', 1).or_empty_str(),
+            symbol_library: symbol_str.split_char_n(':', 0).or_empty_str(),
+            symbol_name: symbol_str.split_char_n(':', 1).or_empty_str(),
             model: get_component_attr(&comp, "Model"),
             datasheet: get_component_attr(&comp, "UserDocLink"),
             attributes: vec![],
@@ -128,19 +131,24 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
                 &m,
             ).or_empty_str().is_true_like()
         {
-            // Validate that reference and package aren't empty
-            if c.reference.is_empty() {
-                return Err(Box::new(errorf(&format!(
-                    "{}: Component.reference is a mandatory field",
-                    &comp.name
-                ))));
+            // Validate that required fields aren't empty
+            let mut req_fields = HashMap::new();
+            req_fields.insert("reference", &c.reference);
+            req_fields.insert("footprint_library", &c.footprint_library);
+            req_fields.insert("footprint_name", &c.footprint_name);
+            req_fields.insert("symbol_library", &c.symbol_library);
+            req_fields.insert("symbol_name", &c.symbol_name);
+
+            // Validate that required fields are set
+            for (key, val) in &req_fields {
+                if val.is_empty() {
+                    return Err(Box::new(errorf(&format!(
+                        "{}: Component.{} is a mandatory field",
+                        &comp.name, key
+                    ))));
+                }
             }
-            if c.package.is_empty() {
-                return Err(Box::new(errorf(&format!(
-                    "{}: Component.package is a mandatory field",
-                    &comp.name
-                ))));
-            }
+
             // Grow the components vector
             sch.components.push(c);
         }
@@ -173,6 +181,7 @@ fn parse_globals_into(kisch: &kicad_schematic::Schematic, globals: &mut Vec<Attr
             _ => continue,
         };
 
+        // TODO: Require a special marked in the text for this parser to parse it.
         // The text element contains literal "\n" elements
         for line in text_element.text.split("\\n") {
             // Format: Foo[.Bar.Baz..] = <expr> [; <unit>]
