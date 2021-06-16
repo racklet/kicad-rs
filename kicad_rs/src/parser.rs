@@ -7,17 +7,37 @@ use kicad_parse_gen::schematic as kicad_schematic;
 
 use crate::types::*;
 
+type ParseResult<T> = Result<T, Box<dyn Error>>;
+
 impl Schematic {
-    pub fn parse(p: &Path) -> Result<Schematic, Box<dyn Error>> {
+    pub fn parse(p: &Path) -> ParseResult<Schematic> {
         parse_schematic(p, String::new())
     }
 }
 
-// parse_schematic turns a schematic at path p into the recursive Schematic struct.
-fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
+/// Turns a KiCad schematic at `path` into a recursive Schematic struct
+fn parse_schematic(path: &Path, id: String) -> ParseResult<Schematic> {
     // Read the schematic using kicad_parse_gen
-    let kisch = kicad_parse_gen::read_schematic(p)?;
+    let kisch = kicad_parse_gen::read_schematic(path)?;
 
+    // Parse the fields for the schematic
+    let meta = parse_meta(&kisch, path)?;
+    let globals = parse_globals(&kisch)?;
+    let components = parse_components(&kisch)?;
+    let sub_schematics = parse_sub_schematics(&kisch)?;
+
+    // Construct and return the parsed schematic
+    Ok(Schematic {
+        id,
+        meta,
+        globals,
+        components,
+        sub_schematics,
+    })
+}
+
+/// Parses the metadata from the given KiCad schematic
+fn parse_meta(kisch: &kicad_schematic::Schematic, path: &Path) -> ParseResult<SchematicMeta> {
     // Only include non-empty comments
     let comments = vec![
         kisch.description.comment1.as_str(),
@@ -29,21 +49,79 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
     .flat_map(|c| c.filter_empty())
     .collect();
 
-    // Build the metadata for this schematic, and instantiate empty vectors to be filled in
-    let mut sch = Schematic {
-        id: id,
-        meta: SchematicMeta {
-            file_name: p.file_name().map(|s| s.to_str()).flatten().or_empty_str(),
-            title: kisch.description.title.as_str().filter_empty(),
-            date: kisch.description.date.as_str().filter_empty(),
-            revision: kisch.description.rev.as_str().filter_empty(),
-            company: kisch.description.comp.as_str().filter_empty(),
-            comments,
-        },
-        globals: vec![],
-        components: vec![],
-        sub_schematics: vec![],
-    };
+    Ok(SchematicMeta {
+        file_name: path
+            .file_name()
+            .map(|s| s.to_str())
+            .flatten()
+            .or_empty_str(),
+        title: kisch.description.title.as_str().filter_empty(),
+        date: kisch.description.date.as_str().filter_empty(),
+        revision: kisch.description.rev.as_str().filter_empty(),
+        company: kisch.description.comp.as_str().filter_empty(),
+        comments,
+    })
+}
+
+/// Parses global definitions from text notes in the KiCad schematic
+fn parse_globals(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Attribute>> {
+    let mut globals = Vec::new();
+
+    // Loop through the elements of the schematic, which includes text notes as well
+    for el in &kisch.elements {
+        // Only match Text elements that have type Note
+        let text_element = match el {
+            kicad_schematic::Element::Text(t) => match t.t {
+                kicad_schematic::TextType::Note => t,
+                _ => continue,
+            },
+            _ => continue,
+        };
+
+        // TODO: Require a special marked in the text for this parser to parse it.
+        // The text element contains literal "\n" elements
+        for line in text_element.text.split("\\n") {
+            // Format: Foo[.Bar.Baz..] = <expr> [; <unit>]
+
+            // First, split by the equals sign. If the equals sign does not exist,
+            // just continue.
+            let (attr_name, expr) = match line.split_once("=") {
+                None => continue,
+                Some(a) => a,
+            };
+
+            // Then, split the "remaining" part expr into two parts by ";", where
+            // the first part overwrites expr, and the other part optionally becomes unit
+            let (expr, unit) = match expr.split_once(";") {
+                None => (expr, None),
+                Some(a) => (a.0, Some(a.1)),
+            };
+
+            // Trim whitespace for all variables
+            let (attr_name, expr) = (attr_name.trim(), expr.trim());
+
+            // attr_name and expr must be non-empty
+            if attr_name.is_empty() || expr.is_empty() {
+                continue;
+            }
+
+            // Push the new attribute into the given vector
+            globals.push(Attribute {
+                name: attr_name.into(),
+                value: String::new(), // TODO: How do we resolve this value?
+                expression: expr.into(),
+                unit: unit.map(|u| u.trim().into()),
+                comment: None,
+            })
+        }
+    }
+
+    Ok(globals)
+}
+
+/// Parses the component definitions present in the given KiCad schematic
+fn parse_components(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Component>> {
+    let mut components = Vec::new();
 
     // Walk through all components in the sheet
     for comp in kisch.components() {
@@ -147,74 +225,25 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
             }
 
             // Grow the components vector
-            sch.components.push(c);
+            components.push(c);
         }
     }
 
-    parse_globals_into(&kisch, &mut sch.globals);
+    Ok(components)
+}
+
+/// Parses nested hierarchical schematic definitions present in the given KiCad schematic
+fn parse_sub_schematics(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Schematic>> {
+    let mut sub_schematics = Vec::new();
 
     // Recursively traverse and parse the sub-schematics
     for sub_sheet in &kisch.sheets {
         // TODO: Use absolute paths, relative to the current schematic
         let p = Path::new(&sub_sheet.filename);
-        sch.sub_schematics
-            .push(parse_schematic(p, sub_sheet.name.clone())?);
+        sub_schematics.push(parse_schematic(p, sub_sheet.name.clone())?);
     }
 
-    // Finally, return the parsed schematic
-    Ok(sch)
-}
-
-// parse_globals_into parses text notes from the schematic into globals
-fn parse_globals_into(kisch: &kicad_schematic::Schematic, globals: &mut Vec<Attribute>) {
-    // Loop through the elements of the schematic, which includes text notes as well
-    for el in &kisch.elements {
-        // Only match Text elements that have type Note
-        let text_element = match el {
-            kicad_schematic::Element::Text(t) => match t.t {
-                kicad_schematic::TextType::Note => t,
-                _ => continue,
-            },
-            _ => continue,
-        };
-
-        // TODO: Require a special marked in the text for this parser to parse it.
-        // The text element contains literal "\n" elements
-        for line in text_element.text.split("\\n") {
-            // Format: Foo[.Bar.Baz..] = <expr> [; <unit>]
-
-            // First, split by the equals sign. If the equals sign does not exist,
-            // just continue.
-            let (attr_name, expr) = match line.split_once("=") {
-                None => continue,
-                Some(a) => a,
-            };
-
-            // Then, split the "remaining" part expr into two parts by ";", where
-            // the first part overwrites expr, and the other part optionally becomes unit
-            let (expr, unit) = match expr.split_once(";") {
-                None => (expr, None),
-                Some(a) => (a.0, Some(a.1)),
-            };
-
-            // Trim whitespace for all variables
-            let (attr_name, expr) = (attr_name.trim(), expr.trim());
-
-            // attr_name and expr must be non-empty
-            if attr_name.is_empty() || expr.is_empty() {
-                continue;
-            }
-
-            // Push the new attribute into the given vector
-            globals.push(Attribute {
-                name: attr_name.into(),
-                value: String::new(), // TODO: How do we resolve this value?
-                expression: expr.into(),
-                unit: unit.map(|u| u.trim().into()),
-                comment: None,
-            })
-        }
-    }
+    Ok(sub_schematics)
 }
 
 // get_component_attr gets the component attribute value for a case-sensitive key, but returns
@@ -326,9 +355,7 @@ struct StringError {
 }
 
 fn errorf(s: &str) -> StringError {
-    StringError {
-        str: s.into(),
-    }
+    StringError { str: s.into() }
 }
 
 impl fmt::Display for StringError {
