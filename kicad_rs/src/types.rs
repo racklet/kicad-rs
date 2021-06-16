@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 
+use crate::labels::Labels;
+
 // These types are used to structure the YAML-formatted output
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -102,4 +104,13 @@ pub struct Attribute {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub comment: Option<String>,
+}
+
+// A vector of Attributes implement the Labels trait
+impl Labels for Vec<Attribute> {
+    fn get_label(&self, key: &str) -> Option<&str> {
+        self.iter()
+            .find(|&a| a.name == key)
+            .map(|a| a.value.as_str())
+    }
 }
