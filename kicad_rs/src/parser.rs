@@ -28,18 +28,18 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
         &kisch.description.comment4,
     ]
     .iter()
-    .flat_map(|c| str_if_nonempty(c))
+    .flat_map(|c| c.as_str().filter_empty())
     .collect();
 
     // Build the metadata for this schematic, and instantiate empty vectors to be filled in
     let mut sch = Schematic {
         id: id,
         meta: SchematicMeta {
-            file_name: str_borrow_unwrap(p.file_name().map(|s| s.to_str()).flatten()),
-            title: str_if_nonempty(&kisch.description.title),
-            date: str_if_nonempty(&kisch.description.date),
-            revision: str_if_nonempty(&kisch.description.rev),
-            company: str_if_nonempty(&kisch.description.comp),
+            file_name: p.file_name().map(|s| s.to_str()).flatten().or_empty_str(),
+            title: kisch.description.title.as_str().filter_empty(),
+            date: kisch.description.date.as_str().filter_empty(),
+            revision: kisch.description.rev.as_str().filter_empty(),
+            company: kisch.description.comp.as_str().filter_empty(),
             comments,
         },
         globals: vec![],
@@ -54,15 +54,13 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
             return Err(Box::new(errorf("Every component must have a name")));
         }
 
+        let footprint_str = get_component_attr(&comp, "Footprint");
+
         // Fill in the metadata about the component. Reference and package fields are validated to be non-empty
         // later, once we know if the component should be included in the result.
         let mut c = Component {
             reference: comp.reference.clone(),
-            package: str_unwrap(
-                get_component_attr(&comp, "Footprint")
-                    .map(|s| s.split_once(":").map(|strs| strs.0.to_owned()))
-                    .flatten(),
-            ),
+            package: footprint_str.split_char_n(':', 0).or_empty_str(),
             category: comp.name.to_owned(),
             model: get_component_attr(&comp, "Model"),
             datasheet: get_component_attr(&comp, "UserDocLink"),
@@ -110,7 +108,7 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
                     main_key.to_owned()
                 },
                 // Get the main key value. It is ok if it's empty, too.
-                value: str_unwrap(get_component_attr_mapped(&comp, main_key, &m)),
+                value: get_component_attr_mapped(&comp, main_key, &m).or_empty_str(),
                 // As this field corresponds to the main key expression attribute, we can get the expression directly
                 expression: f.value.clone(),
                 // Optionally, get the unit
@@ -120,11 +118,11 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
 
         // Only register to the list if it has any expressions, or if it has iccc_show = true set
         if c.attributes.len() > 0
-            || is_true_str(&str_unwrap(get_component_attr_mapped(
+            || get_component_attr_mapped(
                 &comp,
                 "iccc_show",
                 &m,
-            )))
+            ).or_empty_str().is_true_like()
         {
             // Validate that reference and package aren't empty
             if c.reference.is_empty() {
@@ -209,25 +207,10 @@ fn parse_globals_into(kisch: &kicad_schematic::Schematic, globals: &mut Vec<Attr
     }
 }
 
-// is_true_str returns true is s is a "true-like" string like "true" or "1", otherwise false
-fn is_true_str(s: &str) -> bool {
-    s == "true" || s == "1"
-}
-
-// str_unwrap unwraps the String option such that if opt is None, a new, empty String is returned
-fn str_unwrap(opt: Option<String>) -> String {
-    opt.unwrap_or_else(|| String::new())
-}
-
-// str_borrow_unwrap is like str_unwrap, but for an Option containing a string reference
-fn str_borrow_unwrap(opt: Option<&str>) -> String {
-    opt.unwrap_or("").to_owned()
-}
-
 // get_component_attr gets the component attribute value for a case-sensitive key, but returns
 // None if the value is "" or "~"
 fn get_component_attr(comp: &kicad_schematic::Component, key: &str) -> Option<String> {
-    str_if_nonempty_opt(comp.get_field_value(key))
+    comp.get_field_value(key).filter_empty()
 }
 
 // get_component_attr_mapped works like get_component_attr, but allows "key" to be case-insensitive, as long as
@@ -243,21 +226,87 @@ fn get_component_attr_mapped(
         .flatten()
 }
 
-// str_if_nonempty trims the string reference s, and returns it as owned in an Option if non-empty.
-// As a special case, "~" also counts as "empty".
-fn str_if_nonempty(s: &str) -> Option<String> {
-    let s = s.trim();
-    if s.is_empty() || s == "~" {
-        None
-    } else {
-        Some(String::from(s))
+// IsTrueLike provides an is_true_like that turns a type into a bool given type-specific heuristic
+// rules.
+trait IsTrueLike {
+    fn is_true_like(&self) -> bool;
+}
+
+impl<T: AsRef<str>> IsTrueLike for T {
+    // is_true_like returns true is s is a "true-like" string like "true" or "1", otherwise false
+    fn is_true_like(&self) -> bool {
+        self.as_ref() == "true" || self.as_ref() == "1"
     }
 }
 
-// str_if_nonempty_opt passes the string through str_if_nonempty if the option is Some. In other words,
-// this function maps Some("") and Some("~") -> None, and lets all other values be.
-fn str_if_nonempty_opt(s_opt: Option<String>) -> Option<String> {
-    s_opt.map(|s| str_if_nonempty(&s)).flatten()
+// OrEmptyStr provides an or_empty_str method that unwraps a string option in a safe way,
+// defaulting to an empty string if None. The inner string is cloned.
+trait OrEmptyStr {
+    // or_empty_str unwraps the string-like option such that if opt is None, a new, empty String is returned
+    fn or_empty_str(&self) -> String;
+}
+
+impl OrEmptyStr for Option<String> {
+    fn or_empty_str(&self) -> String {
+        self.clone().unwrap_or_else(|| String::new())
+    }
+}
+
+impl OrEmptyStr for Option<&str> {
+    fn or_empty_str(&self) -> String {
+        self.unwrap_or("").to_owned()
+    }
+}
+
+// EmptyFilter provides a filter_empty method that filters a string or string option into a
+// string option, making sure "empty-like" strings make the option become None.
+trait EmptyFilter {
+    fn filter_empty(&self) -> Option<String>;
+}
+
+impl EmptyFilter for &str {
+    // filter_empty trims the string reference s, and returns it as owned in an Option if non-empty.
+    // As a special case, "~" also counts as "empty".
+    fn filter_empty(&self) -> Option<String> {
+        let s = self.trim();
+        if s.is_empty() || s == "~" {
+            None
+        } else {
+            Some(String::from(s))
+        }
+    }
+}
+
+impl<T: AsRef<str>> EmptyFilter for Option<T> {
+    // filter_empty passes the string through &str.filter_empty if the option is Some. In other words,
+    // this function maps Some("") and Some("~") -> None, and lets all other values be.
+    fn filter_empty(&self) -> Option<String> {
+        match self {
+            Some(s) => s.as_ref().filter_empty(),
+            None => None,
+        }
+    }
+}
+
+// SplitCharN provides a split_char_n method that can be used to split a string by a given
+// character, and then return an option wrapping the n-th split match.
+trait SplitCharN {
+    fn split_char_n(&self, split_char: char, idx: usize) -> Option<String>;
+}
+
+impl SplitCharN for &str {
+    fn split_char_n(&self, split_char: char, idx: usize) -> Option<String> {
+        self.split(split_char).nth(idx).map(|s| s.to_owned())
+    }
+}
+
+impl<T: AsRef<str>> SplitCharN for Option<T> {
+    fn split_char_n(&self, split_char: char, idx: usize) -> Option<String> {
+        match self {
+            Some(s) => s.as_ref().split_char_n(split_char, idx),
+            None => None,
+        }
+    }
 }
 
 // A struct implementing the Error trait, carrying just a simple message
