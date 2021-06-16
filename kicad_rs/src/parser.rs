@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt;
 use std::path::Path;
 
 use kicad_parse_gen::schematic as kicad_schematic;
 
+use crate::error::errorf;
 use crate::types::*;
 
 type ParseResult<T> = Result<T, Box<dyn Error>>;
@@ -350,26 +350,5 @@ impl<T: AsRef<str>> SplitCharN for Option<T> {
             Some(s) => s.as_ref().split_char_n(split_char, idx),
             None => None,
         }
-    }
-}
-
-// A struct implementing the Error trait, carrying just a simple message
-#[derive(Debug)]
-struct StringError {
-    str: String,
-}
-
-fn errorf(s: &str) -> StringError {
-    StringError { str: s.into() }
-}
-
-impl fmt::Display for StringError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.str)
-    }
-}
-impl Error for StringError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
     }
 }
