@@ -24,7 +24,7 @@ fn parse_schematic(path: &Path, id: String) -> ParseResult<Schematic> {
     let meta = parse_meta(&kisch, path)?;
     let globals = parse_globals(&kisch)?;
     let components = parse_components(&kisch)?;
-    let sub_schematics = parse_sub_schematics(&kisch)?;
+    let sub_schematics = parse_sub_schematics(&kisch, path)?;
 
     // Construct and return the parsed schematic
     Ok(Schematic {
@@ -37,7 +37,7 @@ fn parse_schematic(path: &Path, id: String) -> ParseResult<Schematic> {
 }
 
 /// Parses the metadata from the given KiCad schematic
-fn parse_meta(kisch: &kicad_schematic::Schematic, path: &Path) -> ParseResult<SchematicMeta> {
+pub fn parse_meta(kisch: &kicad_schematic::Schematic, path: &Path) -> ParseResult<SchematicMeta> {
     // Only include non-empty comments
     let comments = vec![
         kisch.description.comment1.as_str(),
@@ -64,7 +64,7 @@ fn parse_meta(kisch: &kicad_schematic::Schematic, path: &Path) -> ParseResult<Sc
 }
 
 /// Parses global definitions from text notes in the KiCad schematic
-fn parse_globals(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Attribute>> {
+pub fn parse_globals(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Attribute>> {
     let mut globals = Vec::new();
 
     // Loop through the elements of the schematic, which includes text notes as well
@@ -120,7 +120,7 @@ fn parse_globals(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Attribut
 }
 
 /// Parses the component definitions present in the given KiCad schematic
-fn parse_components(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Component>> {
+pub fn parse_components(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Component>> {
     let mut components = Vec::new();
 
     // Walk through all components in the sheet
@@ -233,14 +233,19 @@ fn parse_components(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Compo
 }
 
 /// Parses nested hierarchical schematic definitions present in the given KiCad schematic
-fn parse_sub_schematics(kisch: &kicad_schematic::Schematic) -> ParseResult<Vec<Schematic>> {
+pub fn parse_sub_schematics(
+    kisch: &kicad_schematic::Schematic,
+    path: &Path,
+) -> ParseResult<Vec<Schematic>> {
     let mut sub_schematics = Vec::new();
 
     // Recursively traverse and parse the sub-schematics
     for sub_sheet in &kisch.sheets {
-        // TODO: Use absolute paths, relative to the current schematic
-        let p = Path::new(&sub_sheet.filename);
-        sub_schematics.push(parse_schematic(p, sub_sheet.name.clone())?);
+        let p = path
+            .parent()
+            .unwrap_or(Path::new(""))
+            .join(Path::new(&sub_sheet.filename));
+        sub_schematics.push(parse_schematic(&p, sub_sheet.name.clone())?);
     }
 
     Ok(sub_schematics)
