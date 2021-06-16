@@ -51,7 +51,7 @@ fn evaluate_schematic(sch: &mut Schematic) -> Result<(), Box<dyn Error>> {
         // Add all component attributes to the lookup HashMap, duplicates will error
         // let mut lookup = HashMap::new();
 
-        let mut index: IndexMap = Default::default();
+        let mut index: IndexMap = IndexMap::new();
 
         let index = index_schematic(sch)?;
 
@@ -136,7 +136,7 @@ fn index_schematic(sch: &mut Schematic) -> DynamicResult<IndexMap> {
                     a.name
                 )));
             }
-            attribute_map.tree.insert(a.name.clone(), Node::Leaf(RefCell::new(a)));
+            attribute_map.tree.insert(a.name.clone(), Node::Leaf(a));
         }
         index.tree.insert(c.labels.reference.clone(), Node::Branch(attribute_map));
     }
