@@ -1,3 +1,4 @@
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::io;
 
@@ -16,4 +17,13 @@ where
     serde_yaml::to_writer(writer, &json_val)?;
     // All ok
     Ok(())
+}
+
+// unmarshal_yaml is the reverse operation of marshal_yaml.
+pub fn unmarshal_yaml<R, T>(reader: R) -> serde_yaml::Result<T>
+where
+    R: io::Read,
+    T: DeserializeOwned,
+{
+    serde_yaml::from_reader(reader)
 }
