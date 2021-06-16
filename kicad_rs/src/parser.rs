@@ -22,13 +22,13 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
 
     // Only include non-empty comments
     let comments = vec![
-        &kisch.description.comment1,
-        &kisch.description.comment2,
-        &kisch.description.comment3,
-        &kisch.description.comment4,
+        kisch.description.comment1.as_str(),
+        kisch.description.comment2.as_str(),
+        kisch.description.comment3.as_str(),
+        kisch.description.comment4.as_str(),
     ]
     .iter()
-    .flat_map(|c| c.as_str().filter_empty())
+    .flat_map(|c| c.filter_empty())
     .collect();
 
     // Build the metadata for this schematic, and instantiate empty vectors to be filled in
@@ -75,7 +75,7 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
         // Walk through all the fields, and fill in the m map
         for f in &comp.fields {
             // Optimistically try to insert key_lower into m, and error if there was a duplicate
-            let key_lower = f.name.to_lowercase().clone();
+            let key_lower = f.name.to_lowercase();
             match m.insert(key_lower, f.name.clone()) {
                 None => (), // Key didn't exist before, all ok
                 Some(oldval) => {
@@ -100,8 +100,8 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
             };
 
             // The unit & comment values can be found from the main key + the "_unit"/"_comment" suffixes
-            let unit_key = main_key.to_owned() + "_unit";
-            let comment_key = main_key.to_owned() + "_comment";
+            let unit_key = main_key.to_string() + "_unit";
+            let comment_key = main_key.to_string() + "_comment";
 
             // Create a new attribute with the given parameters
             c.attributes.push(Attribute {
@@ -112,7 +112,7 @@ fn parse_schematic(p: &Path, id: String) -> Result<Schematic, Box<dyn Error>> {
                     m.get(main_key)
                         .map(|s| s.as_str())
                         .unwrap_or(main_key) // TODO: Instead of defaulting to main_key, fallback to f.name - the expr suffix
-                        .to_owned()
+                        .into()
                 },
                 // Get the main key value. It is ok if it's empty, too.
                 value: get_component_attr_mapped(&comp, main_key, &m).or_empty_str(),
@@ -201,7 +201,6 @@ fn parse_globals_into(kisch: &kicad_schematic::Schematic, globals: &mut Vec<Attr
 
             // Trim whitespace for all variables
             let (attr_name, expr) = (attr_name.trim(), expr.trim());
-            let unit = unit.map(|u| u.trim().to_owned());
 
             // attr_name and expr must be non-empty
             if attr_name.is_empty() || expr.is_empty() {
@@ -210,10 +209,10 @@ fn parse_globals_into(kisch: &kicad_schematic::Schematic, globals: &mut Vec<Attr
 
             // Push the new attribute into the given vector
             globals.push(Attribute {
-                name: attr_name.to_owned(),
-                value: String::new(),
-                expression: expr.to_owned(),
-                unit,
+                name: attr_name.into(),
+                value: String::new(), // TODO: How do we resolve this value?
+                expression: expr.into(),
+                unit: unit.map(|u| u.trim().into()),
                 comment: None,
             })
         }
@@ -267,7 +266,7 @@ impl OrEmptyStr for Option<String> {
 
 impl OrEmptyStr for Option<&str> {
     fn or_empty_str(&self) -> String {
-        self.unwrap_or("").to_owned()
+        self.unwrap_or("").into()
     }
 }
 
@@ -285,7 +284,7 @@ impl EmptyFilter for &str {
         if s.is_empty() || s == "~" {
             None
         } else {
-            Some(String::from(s))
+            Some(s.into())
         }
     }
 }
@@ -309,7 +308,7 @@ trait SplitCharN {
 
 impl SplitCharN for &str {
     fn split_char_n(&self, split_char: char, idx: usize) -> Option<String> {
-        self.split(split_char).nth(idx).map(|s| s.to_owned())
+        self.split(split_char).nth(idx).map(|s| s.into())
     }
 }
 
@@ -330,7 +329,7 @@ struct StringError {
 
 fn errorf(s: &str) -> StringError {
     StringError {
-        str: String::from(s),
+        str: s.into(),
     }
 }
 
