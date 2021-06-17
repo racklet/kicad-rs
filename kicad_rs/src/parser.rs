@@ -4,7 +4,6 @@ use std::path::Path;
 
 use crate::error::{errorf, DynamicResult};
 use crate::types::*;
-use evalexpr::Value;
 
 impl Schematic {
     pub fn parse_id(path: &Path, id: String) -> DynamicResult<Schematic> {
@@ -122,7 +121,7 @@ pub fn parse_globals(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Attribute>>
             // Push the new attribute into the given vector
             globals.push(Attribute {
                 name: attr_name.into(),
-                value: Value::Empty, // TODO: How do we resolve this value?
+                value: String::new().into(), // TODO: How do we resolve this value?
                 expression: expr.into(),
                 unit: unit.map(|u| u.trim().into()),
                 comment: None,
@@ -209,7 +208,7 @@ pub fn parse_components(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Componen
                         .into()
                 },
                 // Get the main key value. It is ok if it's empty, too.
-                value: get_component_attr_mapped(&comp, main_key, &m).into_value(),
+                value: Value::parse(get_component_attr_mapped(&comp, main_key, &m).or_empty_str()),
                 // As this field corresponds to the main key expression attribute, we can get the expression directly
                 expression: f.value.clone(),
                 // Optionally, get the unit and a comment
@@ -289,21 +288,6 @@ impl<T: AsRef<str>> IsTrueLike for T {
     // is_true_like returns true is s is a "true-like" string like "true" or "1", otherwise false
     fn is_true_like(&self) -> bool {
         self.as_ref() == "true" || self.as_ref() == "1"
-    }
-}
-
-// IntoValue provides an into_value method that consumes the
-// caller and converts it into an equivalent evalexpr::Value.
-trait IntoValue {
-    fn into_value(self) -> Value;
-}
-
-impl IntoValue for Option<String> {
-    fn into_value(self) -> Value {
-        match self {
-            Some(s) => Value::String(s),
-            None => Value::Empty,
-        }
     }
 }
 
