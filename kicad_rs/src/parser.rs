@@ -104,7 +104,7 @@ pub fn parse_globals(kisch: &kicad_schematic::Schematic) -> DynamicResult<Vec<At
             // Push the new attribute into the given vector
             globals.push(Attribute {
                 name: attr_name.into(),
-                value: String::new(), // TODO: How do we resolve this value?
+                value: String::new().into(), // TODO: How do we resolve this value?
                 expression: expr.into(),
                 unit: unit.map(|u| u.trim().into()),
                 comment: None,
@@ -191,7 +191,7 @@ pub fn parse_components(kisch: &kicad_schematic::Schematic) -> DynamicResult<Vec
                         .into()
                 },
                 // Get the main key value. It is ok if it's empty, too.
-                value: get_component_attr_mapped(&comp, main_key, &m).or_empty_str(),
+                value: Value::parse(get_component_attr_mapped(&comp, main_key, &m).or_empty_str()),
                 // As this field corresponds to the main key expression attribute, we can get the expression directly
                 expression: f.value.clone(),
                 // Optionally, get the unit and a comment

@@ -96,7 +96,8 @@ impl ComponentLabels {
 #[serde(deny_unknown_fields)]
 pub struct Attribute {
     pub name: String,
-    pub value: String,
+    #[serde(flatten)]
+    pub value: Value,
     pub expression: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
@@ -106,11 +107,55 @@ pub struct Attribute {
     pub comment: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", content = "value")]
+pub enum Value {
+    String(String),
+    Float(f64),
+}
+
+impl Value {
+    pub fn parse(s: String) -> Value {
+        if let Ok(f) = s.parse::<f64>() {
+            f.into()
+        } else {
+            s.into()
+        }
+    }
+}
+
+impl ToString for Value {
+    fn to_string(&self) -> String {
+        match self {
+            Value::String(s) => s.clone(),
+            Value::Float(f) => f.to_string(),
+        }
+    }
+}
+
+impl From<String> for Value {
+    fn from(s: String) -> Self {
+        Value::String(s)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Value::String(s.into())
+    }
+}
+
+impl From<f64> for Value {
+    fn from(f: f64) -> Self {
+        Value::Float(f)
+    }
+}
+
 // A vector of Attributes implements the Labels trait
 impl Labels for Vec<Attribute> {
-    fn get_label(&self, key: &str) -> Option<&str> {
+    fn get_label(&self, key: &str) -> Option<String> {
         self.iter()
             .find(|&a| a.name == key)
-            .map(|a| a.value.as_str())
+            .map(|a| a.value.to_string())
     }
 }
