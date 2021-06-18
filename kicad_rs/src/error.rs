@@ -10,8 +10,8 @@ pub struct StringError {
     str: String,
 }
 
-pub fn errorf(s: &str) -> StringError {
-    StringError { str: s.into() }
+pub fn errorf(s: &str) -> Box<dyn Error> {
+    Box::new(StringError { str: s.into() })
 }
 
 impl fmt::Display for StringError {
