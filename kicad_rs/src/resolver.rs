@@ -1,20 +1,54 @@
-use crate::types::Attribute;
 use std::collections::HashMap;
-use crate::error::{DynamicResult, errorf};
-use evalexpr::{Context, ContextWithMutableVariables, Value, ValueType, EvalexprResult, EvalexprError, HashMapContext};
+use crate::error::{DynamicResult};
+use evalexpr::{Context, ContextWithMutableVariables, Value, EvalexprResult, EvalexprError, HashMapContext};
+use crate::resolver::entry::*;
 
-// TODO: Stick this into its own mod to prevent desync?
-#[derive(Debug)]
-pub struct Entry<'a> {
-    attribute: &'a mut Attribute,
-    value: Value,
-}
+mod entry {
+    use crate::types::Attribute;
+    use crate::types::Value as TypesValue;
+    use evalexpr::Value;
+    use crate::error::{DynamicResult, errorf};
+    use std::cell::RefCell;
 
-impl<'a> From<&'a mut Attribute> for Entry<'a> {
-    fn from(attribute: &'a mut Attribute) -> Self {
-        Self {
-            attribute,
-            value: Value::Empty,
+    #[derive(Debug)]
+    pub struct Entry<'a> {
+        set_in_progress: RefCell<bool>,
+        attribute: &'a mut Attribute,
+        value: Option<Value>,
+    }
+
+    impl<'a> Entry<'a> {
+        pub fn update(&mut self, value: Value) -> Option<Value> {
+            *self.set_in_progress.borrow_mut() = false;
+            self.attribute.value = TypesValue::parse(value.to_string());
+            self.value.replace(value)
+        }
+
+        pub fn value_defined(&self) -> DynamicResult<bool> {
+            if *self.set_in_progress.borrow() {
+                // TODO: More precise error reporting
+                return Err(errorf("dependency loop detected"));
+            }
+            *self.set_in_progress.borrow_mut() = true;
+            Ok(self.value.is_some())
+        }
+
+        pub fn get_value(&self) -> Option<&Value> {
+            self.value.as_ref()
+        }
+
+        pub fn get_expression(&self) -> &str {
+            &self.attribute.expression
+        }
+    }
+
+    impl<'a> From<&'a mut Attribute> for Entry<'a> {
+        fn from(attribute: &'a mut Attribute) -> Self {
+            Self {
+                set_in_progress: RefCell::new(false),
+                attribute,
+                value: None,
+            }
         }
     }
 }
@@ -50,66 +84,20 @@ impl<'a> SheetIndex<'a> {
         }
     }
 
-    // fn resolve_depth_mut(&'a mut self, path: &[&str]) -> Option<&'a mut Entry> {
-    //     match path.len() {
-    //         0 => None,
-    //         l => self.map.get_mut(path[0]).map(|n| {
-    //             match n {
-    //                 Node::Branch(m) => if l != 1 { m.resolve_depth_mut(&path[1..]) } else { None },
-    //                 Node::Leaf(e) => if l == 1 { Some(e) } else { None },
-    //             }
-    //         }).flatten(),
-    //     }
-    // }
-
-    // TODO: Fix this
     fn resolve_depth(&self, path: &[&str]) -> Option<&Entry> {
-        // println!("Index: {:#?}", self.map);
-        // println!("Path: {:?}", path);
-
-        // let head = path.first()?;
-        // let attribute_ref = path.get(2).unwrap_or(&""); // "" is the default attribute
-
-        // println!("Head: {}", head);
-        // println!("A_Ref: {:?}", attribute_ref);
-
         self.map.get(*path.first()?).map(|n| {
-            // println!("Found node matching head: {:?}", n);
-
             match n {
                 Node::Sheet(idx) => idx.resolve_depth(&path[1..]),
                 Node::Component(idx) => {
-                    // println!("Found component: {:?}", idx);
-                    if path.len() > 2 { println!("None, why?"); None } else {
-                        // println!("Index retrieve: {}", *attribute_ref);
+                    if path.len() > 2 { None } else {
                         idx.get(*path.get(2).unwrap_or(&""))
                     }
-                },
+                }
             }
         }).flatten()
-
-        // match path.len() {
-        //     0 => { None }
-        //     1 => self.map.get(path[0]).map(|n| {
-        //         match n {
-        //             Node::Sheet(i) => i.resolve_depth(&path[1..]),
-        //             Node::Component(i) => i.get(""),
-        //         }
-        //     }).flatten(),
-        //     l => self.map.get(path[0]).map(|n| {
-        //         match n {
-        //             Node::Sheet(m) => if l != 1 { m.resolve_depth(&path[1..]) } else { None },
-        //             Node::Component(e) => {
-        //                 if l ==
-        //                     if l == 1 { Some(e) } else { None }
-        //             }
-        //         }
-        //     }).flatten(),
-        // }
     }
 
-    // TODO: Fix this, and enable arbitrary modifications to the value
-    fn update_entry_depth_mut(&mut self, path: &[&str], value: Value) -> Option<()> {
+    fn update_entry_depth_mut(&mut self, path: &[&str], value: Value) -> Option<Value> {
         // let head = path.first()?;
         // let attribute_ref = path.last().unwrap_or(&""); // "" is the default attribute
 
@@ -118,12 +106,8 @@ impl<'a> SheetIndex<'a> {
                 Node::Sheet(idx) => idx.update_entry_depth_mut(&path[1..], value),
                 Node::Component(idx) =>
                     if path.len() > 2 { None } else {
-                        idx.get_mut(*path.get(2).unwrap_or(&"")).map(|e|
-                            {
-                                e.value = value;
-                                ()
-                            }
-                        )
+                        idx.get_mut(*path.get(2).unwrap_or(&"")).map(|e| e.update(value)
+                        ).flatten()
                     },
             }
         }).flatten()
@@ -170,12 +154,12 @@ impl<'a> SheetIndex<'a> {
 
 impl<'a> Context for SheetIndex<'a> {
     fn get_value(&self, identifier: &str) -> Option<&Value> {
-        self.resolve_entry(identifier).map(|e| &e.value)
+        self.resolve_entry(identifier).map(|e| e.get_value()).flatten()
     }
 
     fn call_function(&self, identifier: &str, argument: &Value) -> EvalexprResult<Value> {
         // TODO: Fixed function set (voltage divider etc.)
-        unimplemented!("functions are unsupported for now");
+        unimplemented!("functions are currently unsupported");
     }
 }
 
@@ -184,6 +168,7 @@ impl<'a> ContextWithMutableVariables for SheetIndex<'a> {
         println!("Updating entry: {}", identifier);
         self.update_entry(&identifier, value);
 
+        // TODO: Enable the type safety checks below
         // let path = identifier.split('.').collect::<Vec<_>>().as_slice();
         //
         // let t = self.map.get_mut(path[0]);
@@ -241,34 +226,27 @@ pub fn resolve_test(index: &mut SheetIndex) {
     // Evaluate attributes for all components
     let keys: Vec<String> = index.map.keys().map(|s| s.into()).collect();
     for k in keys {
-        evaluate_test(index, k);
+        evaluate_test(index, k).unwrap();
     }
 }
 
-fn evaluate_test(a: &mut SheetIndex, k: String) {
-    // TODO: Don't update if already set
-    // if a.get_value(&k).is_some() {
-    //     return;
-    // }
-
+fn evaluate_test(a: &mut SheetIndex, k: String) -> DynamicResult<()> {
     println!("{}", k);
     // TODO: Error handling for entries not found
     let entry = a.resolve_entry(&k).unwrap();
-    if !entry.value.is_empty() {
-        return;
+
+    if entry.value_defined()? {
+        return Ok(()); // Don't update if already set
     }
 
     // if let Node::Leaf(entry) = &a.map[&k] {
     let node = evalexpr::build_operator_tree(
-        &entry.attribute.expression,
+        entry.get_expression(),
         // a.get_attribute(k.as_str()).borrow().expression.as_str(),
     ).expect("no err"); // TODO: Error handling for invalid expressions
 
     for dep in node.iter_variable_identifiers() {
-        if dep == k {
-            panic!("dependency on self"); // TODO: Change this function to return an error
-        }
-        evaluate_test(a, dep.to_string());
+        evaluate_test(a, dep.to_string())?;
     }
 
     let val = node.eval_with_context(a).unwrap(); // TODO: Error handling
@@ -279,6 +257,7 @@ fn evaluate_test(a: &mut SheetIndex, k: String) {
     //     evaluate2_test(v);
     // }
     // }
+    Ok(())
 }
 
 // fn evaluate2_test(a: &mut Node) {
