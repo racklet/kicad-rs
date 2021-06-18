@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file = SchematicFile::load(path)?;
     let mut schematic = parse_schematic(&file, String::new())?;
 
-    // evaluate_schematic(&mut schematic)?;
+    evaluate_schematic(&mut schematic)?;
     // print!("{}", updated);
 
     // let mut input = HashMap::new();
@@ -45,106 +45,110 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn evaluate_schematic(sch: &mut Schematic) -> Result<(), Box<dyn Error>> {
-        // let attributes = components.iter().flat_map(|c| c.attributes.iter());
+fn evaluate_schematic(sch: &mut Schematic) -> DynamicResult<()> {
+    // let attributes = components.iter().flat_map(|c| c.attributes.iter());
 
-        // Add all component attributes to the lookup HashMap, duplicates will error
-        // let mut lookup = HashMap::new();
+    // Add all component attributes to the lookup HashMap, duplicates will error
+    // let mut lookup = HashMap::new();
 
-        let mut index: IndexMap = IndexMap::new();
+    // let mut index: IndexMap = IndexMap::new();
 
-        let index = index_schematic(sch)?;
+    let mut index = index_schematic(sch)?;
 
-        // for c in &sch.components{
-        //     for a in &c.attributes {
-        //         let id = create_identifier(&c.reference, &a.name);
-        //         if lookup.contains_key(&id) {
-        //             return Err(errorf(&format!(
-        //                 "duplicate attribute definition in components: {}",
-        //                 a.name
-        //             ))));
-        //         }
-        //
-        //         lookup.insert(id, Expression::new(&a, String::new()));
-        //     }
-        // }
+    // println!("{:#?}", index);
 
-        // schematic.components()[0].update_field("test", "result");
+    resolver::resolve_test(&mut index);
 
-        // for a in attributes {
-        //     println!("{:#?}", a);
-        //     let name = a.name.to_owned();
-        //     if expressions.contains_key(&name) {
-        //         return Err(errorf(&format!(
-        //             "duplicate attribute definition in components: {}",
-        //             a.name
-        //         ))));
-        //     }
-        //
-        //     expressions.insert(name, Expression::new(&a, String::new()));
-        // }
+    // println!("{:?}", index);
 
-        // Add all global attributes to the lookup HashMap, here duplicates
-        // are fine since we permit overriding component attributes
-        // for a in &globals {
-        //     lookup.insert(a.name.to_owned(), Expression::new(&a, String::new()));
-        // }
-        //
-        // // Resolve the values
-        // let c = resolver::resolve(&lookup);
-        //
-        // // TODO: Enable
-        // for id in lookup.keys() {
-        //     println!("{}: {}", id, c.get_value(id).unwrap());
-        // }
+    // for c in &sch.components{
+    //     for a in &c.attributes {
+    //         let id = create_identifier(&c.reference, &a.name);
+    //         if lookup.contains_key(&id) {
+    //             return Err(errorf(&format!(
+    //                 "duplicate attribute definition in components: {}",
+    //                 a.name
+    //             ))));
+    //         }
+    //
+    //         lookup.insert(id, Expression::new(&a, String::new()));
+    //     }
+    // }
 
-        // TODO: Make attributes have `&mut value` so it can be updated and serialized again
+    // schematic.components()[0].update_field("test", "result");
 
-        // Collect all attributes of all components in a single iterator
+    // for a in attributes {
+    //     println!("{:#?}", a);
+    //     let name = a.name.to_owned();
+    //     if expressions.contains_key(&name) {
+    //         return Err(errorf(&format!(
+    //             "duplicate attribute definition in components: {}",
+    //             a.name
+    //         ))));
+    //     }
+    //
+    //     expressions.insert(name, Expression::new(&a, String::new()));
+    // }
 
-        // Iterate those attributes and insert them into the hashmap, duplicates error
+    // Add all global attributes to the lookup HashMap, here duplicates
+    // are fine since we permit overriding component attributes
+    // for a in &globals {
+    //     lookup.insert(a.name.to_owned(), Expression::new(&a, String::new()));
+    // }
+    //
+    // // Resolve the values
+    // let c = resolver::resolve(&lookup);
+    //
+    // // TODO: Enable
+    // for id in lookup.keys() {
+    //     println!("{}: {}", id, c.get_value(id).unwrap());
+    // }
 
-        // Insert the global attributes into the hashmap, duplicates are fine (overriding)
+    // TODO: Make attributes have `&mut value` so it can be updated and serialized again
 
-        // Do the evaluation
+    // Collect all attributes of all components in a single iterator
 
-        // let mut input = HashMap::new();
-        // input.insert("a", "5");
-        // input.insert("d", "b * 2");
-        // input.insert("b", "a + c");
-        // input.insert("c", "6");
-        //
-        // let mut expr = HashMap::<String, Expression>::new();
-        // for (k, v) in input {
-        //     expr.insert(String::from(k), Expression::new(v.into(), String::new()));
-        // }
-        //
-        // let c = resolver::resolve(&expr);
-        // println!("{:?}", c.get_value("d"));
+    // Iterate those attributes and insert them into the hashmap, duplicates error
+
+    // Insert the global attributes into the hashmap, duplicates are fine (overriding)
+
+    // Do the evaluation
+
+    // let mut input = HashMap::new();
+    // input.insert("a", "5");
+    // input.insert("d", "b * 2");
+    // input.insert("b", "a + c");
+    // input.insert("c", "6");
+    //
+    // let mut expr = HashMap::<String, Expression>::new();
+    // for (k, v) in input {
+    //     expr.insert(String::from(k), Expression::new(v.into(), String::new()));
+    // }
+    //
+    // let c = resolver::resolve(&expr);
+    // println!("{:?}", c.get_value("d"));
     Ok(())
 }
 
-fn index_schematic(sch: &mut Schematic) -> DynamicResult<IndexMap> {
-    let mut index = IndexMap::new();
+fn index_schematic(sch: &mut Schematic) -> DynamicResult<SheetIndex> {
+    let mut index = SheetIndex::new();
 
     for c in sch.components.iter_mut() {
-        let mut attribute_map = IndexMap::new();
+        let mut attribute_map = ComponentIndex::new();
         for a in c.attributes.iter_mut() {
-            if attribute_map.tree.contains_key(&a.name) {
-                return Err(errorf(&format!(
-                    "duplicate attribute definition: {}",
-                    a.name
-                )));
+            if attribute_map.contains_key(&a.name) {
+                return Err(errorf(&format!("duplicate attribute definition: {}", a.name)));
             }
-            attribute_map.tree.insert(a.name.clone(), Node::Leaf(a));
+            attribute_map.insert(a.name.clone(), a.into());
         }
-        index.tree.insert(c.labels.reference.clone(), Node::Branch(attribute_map));
+        index.map.insert(c.labels.reference.clone(), Node::Component(attribute_map));
     }
 
     for sub_sch in sch.sub_schematics.iter_mut() {
-        if let Some(_) = index.tree.insert(sub_sch.id.clone(), Node::Branch(index_schematic(sub_sch)?)) {
-            return Err(errorf(&format!("component and schematic name collision: {}", "sub_sch.id"))); // TODO: This
+        if index.map.contains_key(&sub_sch.id) {
+            return Err(errorf(&format!("component and schematic name collision: {}", sub_sch.id)));
         }
+        index.map.insert(sub_sch.id.clone(), Node::Sheet(index_schematic(sub_sch)?));
     }
 
     Ok(index)
