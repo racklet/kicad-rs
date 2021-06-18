@@ -58,12 +58,13 @@ pub fn parse_meta(kicad_sch: &SchematicFile) -> DynamicResult<SchematicMeta> {
         kicad_sch.content.description.comment3.as_str(),
         kicad_sch.content.description.comment4.as_str(),
     ]
-        .iter()
-        .flat_map(|c| c.filter_empty())
-        .collect();
+    .iter()
+    .flat_map(|c| c.filter_empty())
+    .collect();
 
     Ok(SchematicMeta {
-        file_name: kicad_sch.path
+        file_name: kicad_sch
+            .path
             .file_name()
             .map(|s| s.to_str())
             .flatten()
@@ -220,8 +221,8 @@ pub fn parse_components(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Componen
         // Only register to the list if it has any expressions, or if it has iccc_show = true set
         if c.attributes.len() > 0
             || get_component_attr_mapped(&comp, "iccc_show", &m)
-            .or_empty_str()
-            .is_true_like()
+                .or_empty_str()
+                .is_true_like()
         {
             // Validate that required fields are set
             for (key, val) in &c.labels.to_map() {
@@ -242,14 +243,13 @@ pub fn parse_components(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Componen
 }
 
 /// Parses nested hierarchical schematic definitions present in the given KiCad schematic
-pub fn parse_sub_schematics(
-    kicad_sch: &SchematicFile,
-) -> DynamicResult<Vec<Schematic>> {
+pub fn parse_sub_schematics(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Schematic>> {
     let mut sub_schematics = Vec::new();
 
     // Recursively traverse and parse the sub-schematics
     for sub_sheet in &kicad_sch.content.sheets {
-        let p = kicad_sch.path
+        let p = kicad_sch
+            .path
             .parent()
             .unwrap_or(Path::new(""))
             .join(Path::new(&sub_sheet.filename));

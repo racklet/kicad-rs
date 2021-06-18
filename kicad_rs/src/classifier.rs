@@ -1,6 +1,6 @@
+use crate::error::DynamicResult;
 use crate::labels::LabelsMatch;
 use crate::requirements::Requirement;
-use crate::error::DynamicResult;
 use crate::types::{Component, Schematic};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
