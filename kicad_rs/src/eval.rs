@@ -43,31 +43,31 @@ pub fn index_schematic(sch: &mut Schematic) -> DynamicResult<SheetIndex> {
 
 pub fn evaluate_schematic(index: &mut SheetIndex) -> DynamicResult<()> {
     // Perform resolving recursively in depth-first order
-    for v in index.map.values_mut() {
-        if let Node::Sheet(sub_index) = v {
+    for node in index.map.values_mut() {
+        if let Node::Sheet(sub_index) = node {
             evaluate_schematic(sub_index)?;
         }
     }
 
     // Collect all attributes for all components
     let mut paths = Vec::new();
-    for (k, v) in index.map.iter() {
-        if let Node::Component(idx) = v {
-            for a in idx.keys() {
-                paths.push(vec![k.into(), a.into()].into())
+    for (node_ref, node) in index.map.iter() {
+        if let Node::Component(component_index) = node {
+            for a in component_index.keys() {
+                paths.push(vec![node_ref.into(), a.into()].into())
             }
         }
     }
 
     // Evaluate all the collected attributes
-    for p in paths.iter() {
-        evaluate(index, p)?;
+    for path in paths.iter() {
+        evaluate(index, path)?;
     }
 
     Ok(())
 }
 
-fn evaluate<'a>(idx: &mut SheetIndex, p: &Path) -> DynamicResult<()> {
+fn evaluate(idx: &mut SheetIndex, p: &Path) -> DynamicResult<()> {
     let entry = idx
         .resolve_entry(p.iter())
         .ok_or(errorf("entry not found"))?;

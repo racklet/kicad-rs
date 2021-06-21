@@ -12,7 +12,9 @@ fn main() -> DynamicResult<()> {
     let file = SchematicFile::load(path)?;
     let mut schematic = parse_schematic(&file, String::new())?;
 
-    // Index the parsed schematic and use the index to evaluate it
+    // Index the parsed schematic and use the index to evaluate it. The
+    // index links to the schematic using mutable references, so that's
+    // why the schematic itself needs to be passed in as mutable here.
     let mut index = eval::index_schematic(&mut schematic)?;
     eval::evaluate_schematic(&mut index)?;
 
