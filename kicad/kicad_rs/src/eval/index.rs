@@ -74,9 +74,8 @@ impl<'a> Context for SheetIndex<'a> {
             .flatten()
     }
 
-    fn call_function(&self, _identifier: &str, _argument: &Value) -> EvalexprResult<Value> {
-        // TODO: Fixed function set (voltage divider etc.)
-        unimplemented!("functions are currently unsupported");
+    fn call_function(&self, identifier: &str, argument: &Value) -> EvalexprResult<Value> {
+        kicad_functions::call_function(identifier, argument)
     }
 }
 
