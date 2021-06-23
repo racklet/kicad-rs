@@ -210,8 +210,10 @@ pub fn parse_components(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Componen
                 },
                 // Get the main key value. It is ok if it's empty, too.
                 value: Value::parse(get_component_attr_mapped(&comp, main_key, &m).or_empty_str()),
-                // As this field corresponds to the main key expression attribute, we can get the expression directly
-                expression: f.value.clone(),
+                // As this field corresponds to the main key expression attribute, we can get the
+                // expression directly. The Eeschema file escapes the field though, so it needs to
+                // be unescaped here first.
+                expression: unescape(&f.value),
                 // Optionally, get the unit and a comment
                 unit: get_component_attr_mapped(&comp, &unit_key, &m),
                 comment: get_component_attr_mapped(&comp, &comment_key, &m),
@@ -358,5 +360,43 @@ impl<T: AsRef<str>> SplitCharN for Option<T> {
             Some(s) => s.as_ref().split_char_n(split_char, idx),
             None => None,
         }
+    }
+}
+
+fn unescape(s: &str) -> String {
+    let mut res = String::new();
+    let mut prev = 0 as char;
+
+    let mut iter = s.chars().peekable();
+    while let Some(c) = iter.next() {
+        let mut next_prev = c;
+        match c {
+            '\\' => {
+                if prev == '\\' {
+                    res.push('\\');
+                    next_prev = 0 as char; // Remove duplicate backslashes
+                } else if iter.peek().map(|next| next != &'\\').unwrap_or(true) {
+                    res.push('"'); // A lone backslash is actually a missing double quote
+                }
+            }
+            c => res.push(c),
+        }
+        prev = next_prev;
+    }
+
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unescape() {
+        assert_eq!(r#"\""#, unescape(r"\\\"));
+        assert_eq!(
+            r#"vdiv(5.1, "(R1+\R2\\)/R2*0.8", 'E96', 500e3, 700e3)"#,
+            unescape(r"vdiv(5.1, \(R1+\\R2\\\\)/R2*0.8\, 'E96', 500e3, 700e3)")
+        )
     }
 }
