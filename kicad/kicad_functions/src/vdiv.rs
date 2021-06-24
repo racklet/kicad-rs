@@ -117,7 +117,7 @@ pub(crate) fn voltage_divider(argument: &Value) -> EvalexprResult<Value> {
     if let Some(res) = calculate(&config) {
         // Take the first result, these are ordered by increasing error
         if let Some((v, set)) = res.iter().next() {
-            let voltage = config.target + *v as f64 / 1e9;
+            let voltage = config.target + fixed_to_floating(*v);
             let mut tuple = vec![Value::from(voltage)];
             for i in 1..=config.count {
                 tuple.push(Value::from(set.r(i)));
@@ -127,4 +127,11 @@ pub(crate) fn voltage_divider(argument: &Value) -> EvalexprResult<Value> {
     }
 
     err(&format!("no solution found: {}", argument))
+}
+
+// resistor_calc outputs error quantities as "fixed point" numbers by multiplying
+// a float by 1e9, rounding the result and converting to u64. We need to undo
+// that procedure here.
+fn fixed_to_floating(value: u64) -> f64 {
+    (value as f64) / 1e9
 }
