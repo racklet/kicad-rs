@@ -5,38 +5,92 @@ use std::path::Path;
 use crate::error::{errorf, DynamicResult};
 use crate::types::*;
 
-impl Schematic {
-    pub fn parse_id(path: &Path, id: String) -> DynamicResult<Schematic> {
-        let file = SchematicFile::load(path)?;
-        parse_schematic(&file, id)
-    }
-
-    pub fn parse(path: &Path) -> DynamicResult<Schematic> {
-        Self::parse_id(path, String::new())
-    }
+// SchematicTree keeps track of all kicad_parse_gen
+// Schematics in a hierarchical schematic configuration
+#[derive(Debug)]
+pub struct SchematicTree {
+    schematic: kicad_schematic::Schematic,
+    sub_schematics: HashMap<String, SchematicTree>,
 }
 
-pub struct SchematicFile<'a> {
-    path: &'a Path,
-    content: kicad_schematic::Schematic,
-}
+impl SchematicTree {
+    // Load a hierarchical SchematicTree from the given base schematic path
+    pub fn load(path: &Path) -> DynamicResult<Self> {
+        let mut sub_schematics = HashMap::new();
+        let schematic = kicad_schematic::parse_file(path)?;
+        for sub_sheet in schematic.sheets.iter() {
+            let filename = kicad_schematic::filename_for_sheet(&schematic, sub_sheet)?;
+            sub_schematics.insert(sub_sheet.name.clone(), SchematicTree::load(&filename)?);
+        }
 
-impl<'a> SchematicFile<'a> {
-    pub fn load(path: &'a Path) -> DynamicResult<Self> {
         Ok(Self {
-            path,
-            // Read the schematic contents using kicad_parse_gen
-            content: kicad_parse_gen::read_schematic(path)?,
+            schematic,
+            sub_schematics,
         })
+    }
+
+    // Parse the SchematicTree into our own nested Schematic struct
+    pub fn parse(&self) -> DynamicResult<Schematic> {
+        parse_schematic(self, String::new())
+    }
+
+    // Update the components in the kicad_parse_gen Schematic tree using the given
+    // nested Schematic struct (copy values from Attributes to ComponentFields)
+    pub fn update(&mut self, schematic: &Schematic) -> DynamicResult<()> {
+        // Update the fields of all components in this schematic
+        for component in schematic.components.iter() {
+            self.schematic
+                .modify_component(&component.labels.reference, |c| {
+                    for attribute in component.attributes.iter() {
+                        let name = attribute.name.as_str().or_default("Value");
+                        c.update_field(name, &attribute.value.to_string());
+                        c.update_field(
+                            &format!("{}{}", name, "_expr"),
+                            // TODO: Fix the escaping issue in upstream kicad_parse_gen
+                            //  and remove this field update altogether.
+                            &escape(&attribute.expression),
+                        );
+                    }
+                })
+        }
+
+        // Recursively update sub-schematics
+        for sub_schematic in schematic.sub_schematics.iter() {
+            match self.sub_schematics.get_mut(&sub_schematic.id) {
+                None => {
+                    return Err(errorf(&format!(
+                        "unknown sub-schematic: {}",
+                        sub_schematic.id
+                    )))
+                }
+                Some(sub_tree) => sub_tree.update(sub_schematic)?,
+            };
+        }
+
+        Ok(())
+    }
+
+    // Write all Schematics in the SchematicTree hierarchy to their
+    // respective files, starting from the node this is called for
+    pub fn write(&self) -> DynamicResult<()> {
+        let path = self.schematic.filename.as_ref().ok_or(errorf(&format!(
+            "missing path for schematic {}",
+            self.schematic.description.title
+        )))?;
+        kicad_parse_gen::write_file(Path::new(path), &self.schematic.to_string())?;
+        for sub_schematic in self.sub_schematics.values() {
+            sub_schematic.write()?;
+        }
+        Ok(())
     }
 }
 
 /// Turns the given KiCad schematic into a recursive Schematic struct
-pub fn parse_schematic(file: &SchematicFile, id: String) -> DynamicResult<Schematic> {
+fn parse_schematic(file: &SchematicTree, id: String) -> DynamicResult<Schematic> {
     // Parse the fields for the schematic
-    let meta = parse_meta(&file)?;
-    let globals = parse_globals(&file)?;
-    let components = parse_components(&file)?;
+    let meta = parse_meta(&file.schematic)?;
+    let globals = parse_globals(&file.schematic)?;
+    let components = parse_components(&file.schematic)?;
     let sub_schematics = parse_sub_schematics(&file)?;
 
     // Construct and return the parsed schematic
@@ -50,39 +104,40 @@ pub fn parse_schematic(file: &SchematicFile, id: String) -> DynamicResult<Schema
 }
 
 /// Parses the metadata from the given KiCad schematic
-pub fn parse_meta(kicad_sch: &SchematicFile) -> DynamicResult<SchematicMeta> {
+fn parse_meta(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<SchematicMeta> {
     // Only include non-empty comments
     let comments = vec![
-        kicad_sch.content.description.comment1.as_str(),
-        kicad_sch.content.description.comment2.as_str(),
-        kicad_sch.content.description.comment3.as_str(),
-        kicad_sch.content.description.comment4.as_str(),
+        kicad_sch.description.comment1.as_str(),
+        kicad_sch.description.comment2.as_str(),
+        kicad_sch.description.comment3.as_str(),
+        kicad_sch.description.comment4.as_str(),
     ]
     .iter()
     .flat_map(|c| c.filter_empty())
     .collect();
 
+    let filename = if let Some(f) = &kicad_sch.filename {
+        Some(f.to_string_lossy().to_string())
+    } else {
+        None
+    };
+
     Ok(SchematicMeta {
-        file_name: kicad_sch
-            .path
-            .file_name()
-            .map(|s| s.to_str())
-            .flatten()
-            .or_empty_str(),
-        title: kicad_sch.content.description.title.as_str().filter_empty(),
-        date: kicad_sch.content.description.date.as_str().filter_empty(),
-        revision: kicad_sch.content.description.rev.as_str().filter_empty(),
-        company: kicad_sch.content.description.comp.as_str().filter_empty(),
+        filename,
+        title: kicad_sch.description.title.as_str().filter_empty(),
+        date: kicad_sch.description.date.as_str().filter_empty(),
+        revision: kicad_sch.description.rev.as_str().filter_empty(),
+        company: kicad_sch.description.comp.as_str().filter_empty(),
         comments,
     })
 }
 
 /// Parses global definitions from text notes in the KiCad schematic
-pub fn parse_globals(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Attribute>> {
+fn parse_globals(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec<Attribute>> {
     let mut globals = Vec::new();
 
     // Loop through the elements of the schematic, which includes text notes as well
-    for el in &kicad_sch.content.elements {
+    for el in &kicad_sch.elements {
         // Only match Text elements that have type Note
         let text_element = match el {
             kicad_schematic::Element::Text(t) => match t.t {
@@ -134,11 +189,11 @@ pub fn parse_globals(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Attribute>>
 }
 
 /// Parses the component definitions present in the given KiCad schematic
-pub fn parse_components(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Component>> {
+fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec<Component>> {
     let mut components = Vec::new();
 
     // Walk through all components in the sheet
-    for comp in kicad_sch.content.components() {
+    for comp in kicad_sch.components() {
         // Require comp.name to be non-empty
         if comp.name.is_empty() {
             return Err(errorf("Every component must have a name"));
@@ -211,8 +266,10 @@ pub fn parse_components(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Componen
                 // Get the main key value. It is ok if it's empty, too.
                 value: Value::parse(get_component_attr_mapped(&comp, main_key, &m).or_empty_str()),
                 // As this field corresponds to the main key expression attribute, we can get the
-                // expression directly. The Eeschema file escapes the field though, so it needs to
-                // be unescaped here first.
+                // expression directly. kicad_parse_gen escapes/unescapes strings with quotes
+                // incorrectly though, so we need a workaround.
+                // TODO: Fix the escaping issue in upstream
+                //  kicad_parse_gen and remove this workaround.
                 expression: unescape(&f.value),
                 // Optionally, get the unit and a comment
                 unit: get_component_attr_mapped(&comp, &unit_key, &m),
@@ -245,17 +302,12 @@ pub fn parse_components(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Componen
 }
 
 /// Parses nested hierarchical schematic definitions present in the given KiCad schematic
-pub fn parse_sub_schematics(kicad_sch: &SchematicFile) -> DynamicResult<Vec<Schematic>> {
+fn parse_sub_schematics(tree: &SchematicTree) -> DynamicResult<Vec<Schematic>> {
     let mut sub_schematics = Vec::new();
 
     // Recursively traverse and parse the sub-schematics
-    for sub_sheet in &kicad_sch.content.sheets {
-        let p = kicad_sch
-            .path
-            .parent()
-            .unwrap_or(Path::new(""))
-            .join(Path::new(&sub_sheet.filename));
-        sub_schematics.push(Schematic::parse_id(&p, sub_sheet.name.clone())?);
+    for (id, schematic) in tree.sub_schematics.iter() {
+        sub_schematics.push(parse_schematic(schematic, id.clone())?);
     }
 
     Ok(sub_schematics)
@@ -363,6 +415,22 @@ impl<T: AsRef<str>> SplitCharN for Option<T> {
     }
 }
 
+trait OrDefault<'a, T> {
+    fn or_default(self, default: T) -> T;
+}
+
+impl<'a, T: Default + PartialEq> OrDefault<'a, T> for T {
+    fn or_default(self, default: T) -> T {
+        if self == Default::default() {
+            return default;
+        }
+
+        self
+    }
+}
+
+// This is a workaround for broken string escaping in kicad_parse_gen.
+// TODO: Fix escaping issue upstream and remove this.
 fn unescape(s: &str) -> String {
     let mut res = String::new();
     let mut prev = 0 as char;
@@ -387,6 +455,21 @@ fn unescape(s: &str) -> String {
     res
 }
 
+// This is a workaround for broken string escaping in kicad_parse_gen.
+// TODO: Fix escaping issue upstream and remove this.
+fn escape(s: &str) -> String {
+    let mut res = String::new();
+
+    for c in s.chars() {
+        match c {
+            '"' => res.push_str(r#"\""#), // Escape backslashes
+            c => res.push(c),
+        }
+    }
+
+    res
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397,6 +480,15 @@ mod tests {
         assert_eq!(
             r#"vdiv(5.1, "(R1+\R2\\)/R2*0.8", 'E96', 500e3, 700e3)"#,
             unescape(r"vdiv(5.1, \(R1+\\R2\\\\)/R2*0.8\, 'E96', 500e3, 700e3)")
+        )
+    }
+
+    #[test]
+    fn test_escape() {
+        assert_eq!(r#"\\""#, escape(r#"\""#));
+        assert_eq!(
+            r#"vdiv(5.1, \"E1*(R1+R2)/R2\", \"E96\", (500e3, 700e3), (0.8))"#,
+            escape(r#"vdiv(5.1, "E1*(R1+R2)/R2", "E96", (500e3, 700e3), (0.8))"#)
         )
     }
 }
