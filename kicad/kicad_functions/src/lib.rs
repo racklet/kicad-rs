@@ -4,7 +4,7 @@ mod vdiv;
 
 use evalexpr::{EvalexprError, EvalexprResult, Value};
 
-// Match function for all custom functions available in the kicad_rs evaluator
+/// Matching function for all custom functions provided by the kicad_rs evaluator
 pub fn call_function(identifier: &str, argument: &Value) -> EvalexprResult<Value> {
     match identifier {
         "idx" => idx::index(argument),

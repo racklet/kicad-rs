@@ -142,10 +142,10 @@ fn calculate(config: &VoltageDividerConfig) -> Option<RRes> {
 }
 
 /// `voltage_divider` computes values for resistor-based voltage dividers.
-/// - Usage: vdiv(<target voltage>, <divider expression>, <resistor series>,
-///               {(<min resistance>, <max resistance>)}, ({extra 1}, {extra 2}, ...))
+/// - Usage: vdiv(\<target voltage\>, \<divider expression\>, \<resistor series\>,
+///               {(\<min resistance\>, \<max resistance\>)}, ({extra 1}, {extra 2}, ...))
 /// - Example: vdiv(5.1, "(R1+R2)/R2*E1", "E96", (500e3, 700e3), (0.8))
-/// - Output: (<closest voltage>, <R1 value>, <R2 value>, ...)
+/// - Output: (\<closest voltage\>, \<R1 value\>, \<R2 value\>, ...)
 /// There can be arbitrary many resistors in the divider, but they must be named "R1", "R2", etc.
 /// The computed optimal resistance values are also presented in this order. The minimal and maximal
 /// resistance pair is an optional parameter, and the limits only consider the sum of resistance of
