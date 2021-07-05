@@ -415,17 +415,26 @@ impl<T: AsRef<str>> SplitCharN for Option<T> {
     }
 }
 
+// OrDefault provides a way to substitute the default value of a variable. For
+// example, the default value of a &str type is "". If the caller equals this
+// default value, the returned value is replaced with the new passed-in default
+// of the same type, otherwise the current value of the caller is returned.
 trait OrDefault<'a, T> {
     fn or_default(self, default: T) -> T;
 }
 
+// OrDefault is implemented for all types that implement Default and PartialEq
+// (for comparing against their type-specific default). The built-in trait Default
+// allows fetching the default value to compare against, e.g. "" for string-like
+// types and 0 for number-like types as the respective type T.
 impl<'a, T: Default + PartialEq> OrDefault<'a, T> for T {
     fn or_default(self, default: T) -> T {
         if self == Default::default() {
+            // If the caller matches its own default, return the new given default instead
             return default;
         }
 
-        self
+        self // Otherwise return the current value of the caller
     }
 }
 
