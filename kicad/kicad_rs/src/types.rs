@@ -28,7 +28,9 @@ pub struct Schematic {
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct SchematicMeta {
-    pub file_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub filename: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub title: Option<String>,
