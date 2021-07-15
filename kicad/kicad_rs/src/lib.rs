@@ -1,4 +1,4 @@
-pub mod classifier;
+pub mod policy;
 pub mod codec;
 pub mod error;
 pub mod eval;

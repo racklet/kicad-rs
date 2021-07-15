@@ -1,9 +1,8 @@
-use kicad_rs::classifier::*;
 use kicad_rs::codec;
 use kicad_rs::error::DynamicResult;
+use kicad_rs::policy;
 use kicad_rs::types::Schematic;
 use std::env;
-use std::fs;
 use std::io;
 use std::path::Path;
 
@@ -18,13 +17,10 @@ fn main() -> DynamicResult<()> {
             .ok_or("expected policy file as first argument")?,
     );
 
-    // Read the policy file
-    let policy: Policy = codec::unmarshal_yaml(fs::File::open(&p)?)?;
-
-    // Transform the schematic using the defined policy
-    let sch = policy.apply(sch)?;
+    // Apply the policy in the given file
+    let processed_sch = policy::apply(&p, sch)?;
 
     // Marshal the resulting schematic as YAML
-    codec::marshal_yaml(&sch, io::stdout())?;
+    codec::marshal_yaml(&processed_sch, io::stdout())?;
     Ok(())
 }
