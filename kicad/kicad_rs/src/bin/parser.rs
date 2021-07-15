@@ -1,6 +1,6 @@
 use kicad_rs::codec;
 use kicad_rs::error::DynamicResult;
-use kicad_rs::types::*;
+use kicad_rs::parser::SchematicTree;
 use std::env;
 use std::io;
 use std::path::Path;
@@ -15,7 +15,8 @@ fn main() -> DynamicResult<()> {
     );
 
     // Parse the schematic file
-    let sch = Schematic::parse(&p)?;
+    let tree = SchematicTree::load(&p)?;
+    let sch = tree.parse()?;
 
     // Marshal as YAML
     codec::marshal_yaml(&sch, io::stdout())?;
