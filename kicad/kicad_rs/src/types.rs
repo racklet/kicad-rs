@@ -10,18 +10,16 @@ use crate::labels::Labels;
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct Schematic {
-    // The "top-level" schematic has id ""
-    pub id: String,
     pub meta: SchematicMeta,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default)]
-    pub globals: Vec<Attribute>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub globals: HashMap<String, Attribute>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default)]
-    pub components: Vec<Component>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub components: HashMap<String, Component>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default)]
-    pub sub_schematics: Vec<Schematic>,
+    pub sub_schematics: HashMap<String, Schematic>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -56,9 +54,15 @@ pub struct Component {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub classes: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default)]
-    pub attributes: Vec<Attribute>,
+    pub attributes: HashMap<String, Attribute>,
+
+    // Disregard everything in this field by never serializing it, but allowing
+    // to deserialize (to avoid an "unknown fields" error).
+    #[serde(skip_serializing)]
+    #[serde(default)]
+    pub generated: serde_json::Value,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -97,7 +101,6 @@ impl ComponentLabels {
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct Attribute {
-    pub name: String,
     #[serde(flatten)]
     pub value: Value,
     pub expression: String,
@@ -154,10 +157,8 @@ impl From<f64> for Value {
 }
 
 // A vector of Attributes implements the Labels trait
-impl Labels for Vec<Attribute> {
+impl Labels for HashMap<String, Attribute> {
     fn get_label(&self, key: &str) -> Option<String> {
-        self.iter()
-            .find(|&a| a.name == key)
-            .map(|a| a.value.to_string())
+        self.get(key).map(|a| a.value.to_string())
     }
 }

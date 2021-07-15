@@ -1,5 +1,6 @@
 use crate::labels::{Labels, LabelsMatch};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // Requirement specifies a requirement for a Labels key-value set.
 // The operator is the enum value, and the data to use for matching
@@ -25,10 +26,10 @@ pub enum Requirement {
     Lt { key: String, values: [f64; 1] },
 }
 
-// Implement the LabelsMatch trait for a vector of requirements ANDed together
-impl LabelsMatch for Vec<Requirement> {
+// Implement the LabelsMatch trait for a HashMap of requirements ANDed together
+impl LabelsMatch for HashMap<String, Requirement> {
     fn matches<L: Labels>(&self, labels: &L) -> bool {
-        self.iter().all(|r| r.matches(labels))
+        self.iter().all(|r| r.1.matches(labels))
     }
 }
 

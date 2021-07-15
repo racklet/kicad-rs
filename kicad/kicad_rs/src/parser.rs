@@ -31,18 +31,18 @@ impl SchematicTree {
 
     // Parse the SchematicTree into our own nested Schematic struct
     pub fn parse(&self) -> DynamicResult<Schematic> {
-        parse_schematic(self, String::new())
+        parse_schematic(self)
     }
 
     // Update the components in the kicad_parse_gen Schematic tree using the given
     // nested Schematic struct (copy values from Attributes to ComponentFields)
     pub fn update(&mut self, schematic: &Schematic) -> DynamicResult<()> {
         // Update the fields of all components in this schematic
-        for component in schematic.components.iter() {
+        for (_, component) in schematic.components.iter() {
             self.schematic
                 .modify_component(&component.labels.reference, |c| {
-                    for attribute in component.attributes.iter() {
-                        let name = attribute.name.as_str().or_default("Value");
+                    for (attr_name, attribute) in component.attributes.iter() {
+                        let name = attr_name.as_str().or_default("Value");
                         c.update_field(name, &attribute.value.to_string());
                         c.update_field(
                             &format!("{}{}", name, "_expr"),
@@ -55,12 +55,12 @@ impl SchematicTree {
         }
 
         // Recursively update sub-schematics
-        for sub_schematic in schematic.sub_schematics.iter() {
-            match self.sub_schematics.get_mut(&sub_schematic.id) {
+        for (sch_id, sub_schematic) in schematic.sub_schematics.iter() {
+            match self.sub_schematics.get_mut(sch_id) {
                 None => {
                     return Err(errorf(&format!(
                         "unknown sub-schematic: {}",
-                        sub_schematic.id
+                        sch_id
                     )))
                 }
                 Some(sub_tree) => sub_tree.update(sub_schematic)?,
@@ -86,7 +86,7 @@ impl SchematicTree {
 }
 
 /// Turns the given KiCad schematic into a recursive Schematic struct
-fn parse_schematic(file: &SchematicTree, id: String) -> DynamicResult<Schematic> {
+fn parse_schematic(file: &SchematicTree) -> DynamicResult<Schematic> {
     // Parse the fields for the schematic
     let meta = parse_meta(&file.schematic)?;
     let globals = parse_globals(&file.schematic)?;
@@ -95,7 +95,6 @@ fn parse_schematic(file: &SchematicTree, id: String) -> DynamicResult<Schematic>
 
     // Construct and return the parsed schematic
     Ok(Schematic {
-        id,
         meta,
         globals,
         components,
@@ -133,8 +132,8 @@ fn parse_meta(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Schematic
 }
 
 /// Parses global definitions from text notes in the KiCad schematic
-fn parse_globals(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec<Attribute>> {
-    let mut globals = Vec::new();
+fn parse_globals(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<HashMap<String, Attribute>> {
+    let mut globals = HashMap::new();
 
     // Loop through the elements of the schematic, which includes text notes as well
     for el in &kicad_sch.elements {
@@ -175,13 +174,12 @@ fn parse_globals(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec<At
             }
 
             // Push the new attribute into the given vector
-            globals.push(Attribute {
-                name: attr_name.into(),
+            globals.insert(attr_name.into(), Attribute {
                 value: String::new().into(), // TODO: How do we resolve this value?
                 expression: expr.into(),
                 unit: unit.map(|u| u.trim().into()),
                 comment: None,
-            })
+            });
         }
     }
 
@@ -189,8 +187,8 @@ fn parse_globals(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec<At
 }
 
 /// Parses the component definitions present in the given KiCad schematic
-fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec<Component>> {
-    let mut components = Vec::new();
+fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<HashMap<String, Component>> {
+    let mut components = HashMap::new();
 
     // Walk through all components in the sheet
     for comp in kicad_sch.components() {
@@ -216,7 +214,8 @@ fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec
                 extra: HashMap::new(),
             },
             classes: vec![],
-            attributes: vec![],
+            attributes: HashMap::new(),
+            generated: serde_json::Value::Null,
         };
 
         // m maps the lower-case representation to the whatever-cased representation
@@ -252,17 +251,15 @@ fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec
             let unit_key = main_key.to_string() + "_unit";
             let comment_key = main_key.to_string() + "_comment";
 
+            // This will write out "Value" as the attribute name for the default attribute.
+            let attr_name = m
+                .get(main_key)
+                .map(|s| s.as_str())
+                .unwrap_or(main_key) // TODO: Instead of defaulting to main_key, fallback to f.name - the expr suffix
+                .into();
+
             // Create a new attribute with the given parameters
-            c.attributes.push(Attribute {
-                // Special case: if the main key is "value", it is the default attribute, and hence name can be ""
-                name: if main_key == "value" {
-                    String::new()
-                } else {
-                    m.get(main_key)
-                        .map(|s| s.as_str())
-                        .unwrap_or(main_key) // TODO: Instead of defaulting to main_key, fallback to f.name - the expr suffix
-                        .into()
-                },
+            c.attributes.insert(attr_name, Attribute {
                 // Get the main key value. It is ok if it's empty, too.
                 value: Value::parse(get_component_attr_mapped(&comp, main_key, &m).or_empty_str()),
                 // As this field corresponds to the main key expression attribute, we can get the
@@ -294,7 +291,7 @@ fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec
             }
 
             // Grow the components vector
-            components.push(c);
+            components.insert(c.labels.reference.clone(), c);
         }
     }
 
@@ -302,12 +299,12 @@ fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Vec
 }
 
 /// Parses nested hierarchical schematic definitions present in the given KiCad schematic
-fn parse_sub_schematics(tree: &SchematicTree) -> DynamicResult<Vec<Schematic>> {
-    let mut sub_schematics = Vec::new();
+fn parse_sub_schematics(tree: &SchematicTree) -> DynamicResult<HashMap<String, Schematic>> {
+    let mut sub_schematics = HashMap::new();
 
     // Recursively traverse and parse the sub-schematics
     for (id, schematic) in tree.sub_schematics.iter() {
-        sub_schematics.push(parse_schematic(schematic, id.clone())?);
+        sub_schematics.insert(id.into(), parse_schematic(schematic)?);
     }
 
     Ok(sub_schematics)
