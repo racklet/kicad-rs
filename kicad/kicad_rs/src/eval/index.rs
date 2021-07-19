@@ -1,10 +1,8 @@
 use crate::eval::entry::Entry;
 use crate::eval::path::Path;
+use crate::parser::VALUE_FIELD_KEY;
 use evalexpr::{Context, ContextWithMutableVariables, EvalexprError, EvalexprResult, Value};
 use std::collections::HashMap;
-
-// The default attribute is signified by an empty string
-const DEFAULT_ATTR: String = String::new();
 
 pub type ComponentIndex<'a> = HashMap<String, Entry<'a>>;
 
@@ -36,7 +34,7 @@ impl<'a> SheetIndex<'a> {
                     if path.len() > 1 {
                         None // There's more elements, an incomplete path was given
                     } else {
-                        idx.get(path.next().unwrap_or(&DEFAULT_ATTR))
+                        idx.get(path.next().unwrap_or(&String::from(VALUE_FIELD_KEY)))
                     }
                 }
             })
@@ -58,7 +56,7 @@ impl<'a> SheetIndex<'a> {
                 if path.len() > 1 {
                     Err(err("component encountered during traversal"))
                 } else {
-                    idx.get_mut(path.next().unwrap_or(&DEFAULT_ATTR))
+                    idx.get_mut(path.next().unwrap_or(&String::from(VALUE_FIELD_KEY)))
                         .ok_or(err("attribute not found"))?
                         .update(value)
                 }

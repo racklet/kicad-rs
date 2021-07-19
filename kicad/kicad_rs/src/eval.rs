@@ -8,23 +8,20 @@ use crate::eval::path::Path;
 use crate::types::Schematic;
 
 pub fn index_schematic(sch: &mut Schematic) -> DynamicResult<SheetIndex> {
-    // TODO: Revisit the SheetIndex idea now that Schematic contains HashMaps?
     let mut index = SheetIndex::new();
 
-    for (_, c) in sch.components.iter_mut() {
+    for component in sch.components.values_mut() {
         let mut component_idx = ComponentIndex::new();
-        for (attr_name, a) in c.attributes.iter_mut() {
-            if component_idx.contains_key(attr_name) {
-                return Err(errorf(&format!(
-                    "duplicate attribute definition: {}",
-                    attr_name
-                )));
+        for (name, attribute) in component.attributes.iter_mut() {
+            if component_idx.contains_key(name) {
+                return Err(errorf(&format!("duplicate attribute definition: {}", name)));
             }
-            component_idx.insert(attr_name.into(), (attr_name, a).into());
+            component_idx.insert(name.into(), attribute.into());
         }
-        index
-            .map
-            .insert(c.labels.reference.clone(), Node::Component(component_idx));
+        index.map.insert(
+            component.labels.reference.clone(),
+            Node::Component(component_idx),
+        );
     }
 
     for (sch_id, sub_sch) in sch.sub_schematics.iter_mut() {
@@ -68,23 +65,26 @@ pub fn evaluate_schematic(index: &mut SheetIndex) -> DynamicResult<()> {
     Ok(())
 }
 
+// TODO: Support u, k, M, G, etc. suffixes. Now the evaluator treats them as a variable.
+//  This can also be used to work around lacking support for negative exponents.
+// TODO: Support case-insensitive referencing of attributes (e.g. C3.Value == C3.value)?
+// TODO: Decide whether we should write out the unit too in the value or not, e.g.
+//  "35" vs "35 F". "35 F" looks nicer in KiCad, but also might mess up the parsing unless
+//  we have a well-known "undo" method like stripping the " {}" suffix where {} is the unit
+//  before parsing the rest of the string into a float or string.
+// TODO: An expression like "R7.Value/500" will perform integer division if both expressions
+//  resolve to an integer, which is something to be aware of. Additionally, it seems like
+//  putting just "500.0" in an expression resolves to "500" in the output, something which might
+//  be desired, but just worth documenting.
 fn evaluate(idx: &mut SheetIndex, p: &Path) -> DynamicResult<()> {
-    // TODO: Support u, k, M, G, etc. suffixes. Now the evaluator treats them as a
-    // variable.
-    // TODO: Support case-insensitive referencing of attributes (e.g. C3.Value == C3.value)?
-    // TODO: Decide whether we should write out the unit too in the value or not, e.g.
-    // "35" vs "35 F". "35 F" looks nicer in KiCad, but also might mess up the parsing unless
-    // we have a well-known "undo" method like stripping the " {}" suffix where {} is the unit
-    // before parsing the rest of the string into a float or string.
-    // TODO: An expression like "R7.Value/500" will perform integer division if both expressions
-    // resolve to an integer, which is something to be aware of. Additionally, it seems like putting
-    // just "500.0" in an expression resolves to "500" in the output, something which might be
-    // desired, but just worth documenting.
     let entry = idx
         .resolve_entry(p.iter())
         .ok_or(errorf(&format!("entry not found: {}", p)))?;
 
-    if entry.value_defined()? {
+    if entry
+        .value_defined()
+        .map_err(|e| errorf(&format!("error accessing {}: {}", p, e.to_string())))?
+    {
         return Ok(()); // Don't update if already set
     }
 

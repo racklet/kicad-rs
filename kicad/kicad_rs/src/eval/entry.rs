@@ -7,7 +7,6 @@ use std::cell::RefCell;
 #[derive(Debug)]
 pub struct Entry<'a> {
     set_in_progress: RefCell<bool>,
-    attr_name: &'a String,
     attribute: &'a mut Attribute,
     value: Option<Value>,
 }
@@ -26,10 +25,6 @@ fn expected_type(expected_type: &ValueType, actual: Value) -> EvalexprError {
 }
 
 impl<'a> Entry<'a> {
-    pub fn get_name(&self) -> &str {
-        self.attr_name
-    }
-
     pub fn get_expression(&self) -> &str {
         &self.attribute.expression
     }
@@ -59,7 +54,6 @@ impl<'a> Entry<'a> {
 
     pub fn value_defined(&self) -> DynamicResult<bool> {
         if *self.set_in_progress.borrow() {
-            // TODO: More precise error reporting
             return Err(errorf("dependency loop detected"));
         }
 
@@ -68,12 +62,11 @@ impl<'a> Entry<'a> {
     }
 }
 
-impl<'a> From<(&'a String, &'a mut Attribute)> for Entry<'a> {
-    fn from(attr_tuple: (&'a String, &'a mut Attribute)) -> Self {
+impl<'a> From<&'a mut Attribute> for Entry<'a> {
+    fn from(attribute: &'a mut Attribute) -> Self {
         Self {
             set_in_progress: RefCell::new(false),
-            attr_name: attr_tuple.0,
-            attribute: attr_tuple.1,
+            attribute,
             value: None,
         }
     }

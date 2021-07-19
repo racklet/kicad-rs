@@ -5,6 +5,10 @@ use std::path::Path;
 use crate::error::{errorf, DynamicResult};
 use crate::types::*;
 
+// All symbols in Eeschema files have a mandatory value field which is used for the primary
+// unit of the component (i.e. resistance for a resistor, capacitance for a capacitor)
+pub(crate) const VALUE_FIELD_KEY: &str = "Value";
+
 // SchematicTree keeps track of all kicad_parse_gen
 // Schematics in a hierarchical schematic configuration
 #[derive(Debug)]
@@ -42,7 +46,7 @@ impl SchematicTree {
             self.schematic
                 .modify_component(&component.labels.reference, |c| {
                     for (attr_name, attribute) in component.attributes.iter() {
-                        let name = attr_name.as_str().or_default("Value");
+                        let name = attr_name.as_str().or_default(VALUE_FIELD_KEY);
                         c.update_field(name, &attribute.value.to_string());
                     }
                 })

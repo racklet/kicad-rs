@@ -88,6 +88,8 @@ impl VoltageDividerConfig {
     }
 }
 
+// TODO: Support u, k, M, G, etc. suffixes. Now the evaluator treats them as a variable.
+//  This can also be used to work around lacking support for negative exponents.
 fn calculate(config: &VoltageDividerConfig) -> Option<RRes> {
     let calc = RCalc::new(vec![config.series; config.count]);
 
