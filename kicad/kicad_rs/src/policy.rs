@@ -76,9 +76,7 @@ pub fn apply(cue_policy_file: &Path, sch: Schematic) -> DynamicResult<Schematic>
     // Marshal the now-classified Schematic back to YAML, inside the SchematicHolder struct
     // (to support arbitrary Schematic nesting) for piping to CUE defaulting and validation step
     let mut schematic_yaml: Vec<u8> = Vec::new();
-    let sch_holder = SchematicHolder{
-        schematic: sch,
-    };
+    let sch_holder = SchematicHolder { schematic: sch };
     codec::marshal_yaml(&sch_holder, &mut schematic_yaml)?;
 
     // Write the in-binary "map and reduction" CUE files to a temporary directory

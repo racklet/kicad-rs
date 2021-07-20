@@ -57,12 +57,7 @@ impl SchematicTree {
         // Recursively update sub-schematics
         for (sch_id, sub_schematic) in schematic.sub_schematics.iter() {
             match self.sub_schematics.get_mut(sch_id) {
-                None => {
-                    return Err(errorf(&format!(
-                        "unknown sub-schematic: {}",
-                        sch_id
-                    )))
-                }
+                None => return Err(errorf(&format!("unknown sub-schematic: {}", sch_id))),
                 Some(sub_tree) => sub_tree.update(sub_schematic)?,
             };
         }
@@ -132,7 +127,9 @@ fn parse_meta(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Schematic
 }
 
 /// Parses global definitions from text notes in the KiCad schematic
-fn parse_globals(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<HashMap<String, Attribute>> {
+fn parse_globals(
+    kicad_sch: &kicad_schematic::Schematic,
+) -> DynamicResult<HashMap<String, Attribute>> {
     let mut globals = HashMap::new();
 
     // Loop through the elements of the schematic, which includes text notes as well
@@ -174,12 +171,15 @@ fn parse_globals(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<HashMa
             }
 
             // Push the new attribute into the given vector
-            globals.insert(attr_name.into(), Attribute {
-                value: String::new().into(), // TODO: How do we resolve this value?
-                expression: expr.into(),
-                unit: unit.map(|u| u.trim().into()),
-                comment: None,
-            });
+            globals.insert(
+                attr_name.into(),
+                Attribute {
+                    value: String::new().into(), // TODO: How do we resolve this value?
+                    expression: expr.into(),
+                    unit: unit.map(|u| u.trim().into()),
+                    comment: None,
+                },
+            );
         }
     }
 
@@ -187,7 +187,9 @@ fn parse_globals(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<HashMa
 }
 
 /// Parses the component definitions present in the given KiCad schematic
-fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<HashMap<String, Component>> {
+fn parse_components(
+    kicad_sch: &kicad_schematic::Schematic,
+) -> DynamicResult<HashMap<String, Component>> {
     let mut components = HashMap::new();
 
     // Walk through all components in the sheet
@@ -259,19 +261,24 @@ fn parse_components(kicad_sch: &kicad_schematic::Schematic) -> DynamicResult<Has
                 .into();
 
             // Create a new attribute with the given parameters
-            c.attributes.insert(attr_name, Attribute {
-                // Get the main key value. It is ok if it's empty, too.
-                value: Value::parse(get_component_attr_mapped(&comp, main_key, &m).or_empty_str()),
-                // As this field corresponds to the main key expression attribute, we can get the
-                // expression directly. kicad_parse_gen escapes/unescapes strings with quotes
-                // incorrectly though, so we need a workaround.
-                // TODO: Fix the escaping issue in upstream
-                //  kicad_parse_gen and remove this workaround.
-                expression: unescape(&f.value),
-                // Optionally, get the unit and a comment
-                unit: get_component_attr_mapped(&comp, &unit_key, &m),
-                comment: get_component_attr_mapped(&comp, &comment_key, &m),
-            });
+            c.attributes.insert(
+                attr_name,
+                Attribute {
+                    // Get the main key value. It is ok if it's empty, too.
+                    value: Value::parse(
+                        get_component_attr_mapped(&comp, main_key, &m).or_empty_str(),
+                    ),
+                    // As this field corresponds to the main key expression attribute, we can get the
+                    // expression directly. kicad_parse_gen escapes/unescapes strings with quotes
+                    // incorrectly though, so we need a workaround.
+                    // TODO: Fix the escaping issue in upstream
+                    //  kicad_parse_gen and remove this workaround.
+                    expression: unescape(&f.value),
+                    // Optionally, get the unit and a comment
+                    unit: get_component_attr_mapped(&comp, &unit_key, &m),
+                    comment: get_component_attr_mapped(&comp, &comment_key, &m),
+                },
+            );
         }
 
         // Only register to the list if it has any expressions, or if it has iccc_show = true set
