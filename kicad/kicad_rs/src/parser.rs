@@ -44,12 +44,6 @@ impl SchematicTree {
                     for (attr_name, attribute) in component.attributes.iter() {
                         let name = attr_name.as_str().or_default("Value");
                         c.update_field(name, &attribute.value.to_string());
-                        c.update_field(
-                            &format!("{}{}", name, "_expr"),
-                            // TODO: Fix the escaping issue in upstream kicad_parse_gen
-                            //  and remove this field update altogether.
-                            &escape(&attribute.expression),
-                        );
                     }
                 })
         }
@@ -268,12 +262,9 @@ fn parse_components(
                     value: Value::parse(
                         get_component_attr_mapped(&comp, main_key, &m).or_empty_str(),
                     ),
-                    // As this field corresponds to the main key expression attribute, we can get the
-                    // expression directly. kicad_parse_gen escapes/unescapes strings with quotes
-                    // incorrectly though, so we need a workaround.
-                    // TODO: Fix the escaping issue in upstream
-                    //  kicad_parse_gen and remove this workaround.
-                    expression: unescape(&f.value),
+                    // As this field corresponds to the main key expression
+                    // attribute, we can get the expression directly
+                    expression: f.value.clone(),
                     // Optionally, get the unit and a comment
                     unit: get_component_attr_mapped(&comp, &unit_key, &m),
                     comment: get_component_attr_mapped(&comp, &comment_key, &m),
@@ -439,69 +430,5 @@ impl<'a, T: Default + PartialEq> OrDefault<'a, T> for T {
         }
 
         self // Otherwise return the current value of the caller
-    }
-}
-
-// This is a workaround for broken string escaping in kicad_parse_gen.
-// TODO: Fix escaping issue upstream and remove this.
-fn unescape(s: &str) -> String {
-    let mut res = String::new();
-    let mut prev = 0 as char;
-
-    let mut iter = s.chars().peekable();
-    while let Some(c) = iter.next() {
-        let mut next_prev = c;
-        match c {
-            '\\' => {
-                if prev == '\\' {
-                    res.push('\\');
-                    next_prev = 0 as char; // Remove duplicate backslashes
-                } else if iter.peek().map(|next| next != &'\\').unwrap_or(true) {
-                    res.push('"'); // A lone backslash is actually a missing double quote
-                }
-            }
-            c => res.push(c),
-        }
-        prev = next_prev;
-    }
-
-    res
-}
-
-// This is a workaround for broken string escaping in kicad_parse_gen.
-// TODO: Fix escaping issue upstream and remove this.
-fn escape(s: &str) -> String {
-    let mut res = String::new();
-
-    for c in s.chars() {
-        match c {
-            '"' => res.push_str(r#"\""#), // Escape backslashes
-            c => res.push(c),
-        }
-    }
-
-    res
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_unescape() {
-        assert_eq!(r#"\""#, unescape(r"\\\"));
-        assert_eq!(
-            r#"vdiv(5.1, "(R1+\R2\\)/R2*0.8", 'E96', 500e3, 700e3)"#,
-            unescape(r"vdiv(5.1, \(R1+\\R2\\\\)/R2*0.8\, 'E96', 500e3, 700e3)")
-        )
-    }
-
-    #[test]
-    fn test_escape() {
-        assert_eq!(r#"\\""#, escape(r#"\""#));
-        assert_eq!(
-            r#"vdiv(5.1, \"E1*(R1+R2)/R2\", \"E96\", (500e3, 700e3), (0.8))"#,
-            escape(r#"vdiv(5.1, "E1*(R1+R2)/R2", "E96", (500e3, 700e3), (0.8))"#)
-        )
     }
 }
