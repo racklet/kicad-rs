@@ -7,6 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-evalexpr = "6.1"
+evalexpr = "6"
 regex = "1.5"
-resistor-calc = { git = "https://github.com/racklet/resistor-calc.git", branch = "fix-no-expr_builder-compile", default-features = false }
+resistor-calc = { git = "https://github.com/racklet/resistor-calc.git", default-features = false }
