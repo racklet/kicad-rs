@@ -6,6 +6,7 @@ use crate::error::{errorf, DynamicResult};
 use crate::eval::index::{ComponentIndex, Node, SheetIndex};
 use crate::eval::path::Path;
 use crate::types::Schematic;
+use std::path::Path as StdPath;
 
 pub fn index_schematic(sch: &mut Schematic) -> DynamicResult<SheetIndex> {
     let mut index = SheetIndex::new();
@@ -25,15 +26,22 @@ pub fn index_schematic(sch: &mut Schematic) -> DynamicResult<SheetIndex> {
     }
 
     for (sch_id, sub_sch) in sch.sub_schematics.iter_mut() {
-        if index.map.contains_key(sch_id) {
+        let sch_name: &str = sub_sch
+            .meta
+            .filename
+            .as_ref()
+            .map(|s| StdPath::new(s).file_stem().map(|s| s.to_str()).flatten())
+            .flatten()
+            .unwrap_or(&sch_id);
+        if index.map.contains_key(sch_name) {
             return Err(errorf(&format!(
                 "component and schematic name collision: {}",
-                sch_id
+                sch_name
             )));
         }
         index
             .map
-            .insert(sch_id.into(), Node::Sheet(index_schematic(sub_sch)?));
+            .insert(sch_name.into(), Node::Sheet(index_schematic(sub_sch)?));
     }
 
     Ok(index)
@@ -52,7 +60,7 @@ pub fn evaluate_schematic(index: &mut SheetIndex) -> DynamicResult<()> {
     for (node_ref, node) in index.map.iter() {
         if let Node::Component(component_index) = node {
             for a in component_index.keys() {
-                paths.push(vec![node_ref.into(), a.into()].into())
+                paths.push(vec![node_ref.into(), a.into()].into());
             }
         }
     }

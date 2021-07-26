@@ -53,7 +53,7 @@ impl<'a> Entry<'a> {
     }
 
     pub fn value_defined(&self) -> DynamicResult<bool> {
-        if *self.set_in_progress.borrow() {
+        if self.value.is_none() && *self.set_in_progress.borrow() {
             return Err(errorf("dependency loop detected"));
         }
 

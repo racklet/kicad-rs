@@ -1,12 +1,28 @@
+use clap::{App, Arg};
 use kicad_rs::error::DynamicResult;
 use kicad_rs::eval;
 use kicad_rs::parser::SchematicTree;
-use std::env;
+
+// Get crate version information from Cargo
+const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
 // Main function, can return different kinds of errors
 fn main() -> DynamicResult<()> {
-    let args: Vec<String> = env::args().collect();
-    let path = std::path::Path::new(args.get(1).ok_or("expected file as first argument")?);
+    let matches = App::new("KiCad evaluator")
+        .about("Evaluates expressions in KiCad Eeschema schematics")
+        .author("Dennis Marttinen (@twelho), The Racklet Project")
+        .version(VERSION.unwrap_or("unknown"))
+        .version_short("v")
+        .arg(
+            Arg::with_name("SCHEMATIC")
+                .help("Path to the schematic file to process")
+                .required(true),
+        )
+        .get_matches();
+
+    // Calling .unwrap() is safe here because "SCHEMATIC" is required (if "SCHEMATIC"
+    // wasn't required we could have used an 'if let' to conditionally get the value)
+    let path = std::path::Path::new(matches.value_of("SCHEMATIC").unwrap());
 
     // Load the hierarchical schematic tree and parse it
     let mut tree = SchematicTree::load(path)?;
