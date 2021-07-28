@@ -1,4 +1,5 @@
 use crate::error::{errorf, DynamicResult};
+use crate::eval::display::PrettyPrintValue;
 use crate::types;
 use crate::types::Attribute;
 use evalexpr::{EvalexprError, EvalexprResult, Value, ValueType};
@@ -35,13 +36,7 @@ impl<'a> Entry<'a> {
 
     pub fn update(&mut self, value: Value) -> EvalexprResult<Option<Value>> {
         *self.set_in_progress.borrow_mut() = false;
-
-        let mut str = value.to_string();
-        if let Some(unit) = self.attribute.unit.as_ref() {
-            str.push(' ');
-            str.push_str(unit);
-        }
-
+        let str = PrettyPrintValue::new(&value, &self.attribute.unit).to_string();
         self.attribute.value = types::Value::parse(str);
         if let Some(t) = self.value.as_ref().map(|v| ValueType::from(v)) {
             if t != ValueType::from(&value) {

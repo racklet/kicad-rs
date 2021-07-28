@@ -1,3 +1,4 @@
+mod display;
 mod entry;
 mod index;
 mod path;

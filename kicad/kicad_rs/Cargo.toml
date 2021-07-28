@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 clap = "2.33"
 evalexpr = "6"
+gpoint = "0.1"
 kicad_functions = { path = "../kicad_functions" }
 kicad_parse_gen = { git = "https://github.com/racklet/kicad-parse-gen" }
 serde = { version = "1.0", features = ["derive"] }
