@@ -1,6 +1,62 @@
-# base-repo-layout
+# kicad-rs
 
-Template (base) repository file layout for Racklet projects.
+## Sample usage
+
+### Evaluator
+
+- Reads from Stdin: No
+- Writes to Stdout: No
+
+Arguments:
+
+1. Schematic file to evaluate, will update in-place
+
+```bash
+# This command will update the file in place
+cargo run --bin=evaluator testdata/test.sch
+```
+
+### Parser
+
+- Reads from Stdin: No
+- Writes to Stdout: Yes
+
+Arguments:
+
+1. Schematic file to parse
+
+```bash
+# Or any other .sch file. This command writes to stdout, you can save it in a
+# file like this or pipe it to the classifier.
+cargo run --bin=parser testdata/test.sch > parsed.yaml
+```
+
+### Classifier
+
+> **Important**: Before you use the classifier, make sure to [install CUE].
+> If you have Go installed, run:
+>
+> ```bash
+> GO111MODULE=on go get cuelang.org/go/cmd/cue
+> ```
+
+[install CUE]: https://cuelang.org/docs/install/
+
+- Reads from Stdin: Yes
+- Writes to Stdout: Yes
+
+Arguments:
+
+1. Policy file written in CUE to use. A sample file is given in `testdata/test.cue`
+2. (Optional) Path to the `cue` binary, defaults to resolving from your `PATH`.
+
+```bash
+# Read from the parsed file like this and save to a file, or...
+cat parsed.yaml | cargo run --bin=classifier testdata/test.cue > classified.yaml
+
+# ... pipe the output from the parser like this (writes to stdout)
+cargo run --bin=parser testdata/test.sch | cargo run --bin=classifier testdata/test.cue
+```
 
 ## Contributing
 
