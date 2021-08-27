@@ -1,24 +1,43 @@
+use clap::{App, Arg};
 use kicad_rs::codec;
 use kicad_rs::error::DynamicResult;
 use kicad_rs::policy;
 use kicad_rs::types::Schematic;
-use std::env;
 use std::io;
 use std::path::Path;
+
+// Get crate version information from Cargo
+const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
 fn main() -> DynamicResult<()> {
     // Read the Schematic YAML from stdin
     let sch: Schematic = codec::unmarshal_yaml(io::stdin())?;
 
-    // Read the first argument as the path to the policy file
-    let args: Vec<String> = env::args().collect();
-    let p = Path::new(
-        args.get(1)
-            .ok_or("expected policy file as first argument")?,
-    );
+    let matches = App::new("KiCad classifier")
+        .about("Classifies components in schematics based on policy expressed in CUE")
+        .author("Lucas Käldström (@luxas), The Racklet Project")
+        .version(VERSION.unwrap_or("unknown"))
+        .version_short("v")
+        .arg(
+            Arg::with_name("CUE_POLICY")
+                .help("Path to the CUE policy to process")
+                .required(true),
+        ) // TODO: Allow passing the YAML file as well, instead of stdin.
+        .arg(
+            Arg::with_name("CUE_BIN")
+                .default_value("cue")
+                .env("CUE_BIN")
+                .help("Path to the cue binary. Download from cuelang.org."),
+        )
+        .get_matches();
+
+    // Calling .unwrap() is safe here because "CUE_POLICY" is required (if "CUE_POLICY"
+    // wasn't required we could have used an 'if let' to conditionally get the value)
+    let policy_path = Path::new(matches.value_of("CUE_POLICY").unwrap());
+    let cue_path = Path::new(matches.value_of("CUE_BIN").unwrap());
 
     // Apply the policy in the given file
-    let processed_sch = policy::apply(&p, sch)?;
+    let processed_sch = policy::apply(&policy_path, &cue_path, sch)?;
 
     // Marshal the resulting schematic as YAML
     codec::marshal_yaml(&processed_sch, io::stdout())?;
