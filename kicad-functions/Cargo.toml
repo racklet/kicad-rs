@@ -1,5 +1,5 @@
 [package]
-name = "kicad_functions"
+name = "kicad-functions"
 version = "0.1.0"
 authors = ["Dennis Marttinen <twelho@welho.tech>"]
 edition = "2018"

@@ -1,2 +1,2 @@
 [workspace]
-members = ["kicad_rs", "kicad_functions"]
+members = ["kicad-rs", "kicad-functions"]
