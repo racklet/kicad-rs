@@ -46,7 +46,7 @@ pub struct ComponentClassifier {
     pub attributes: HashMap<String, Requirement>,
 }
 
-pub fn apply(cue_policy_file: &Path, sch: Schematic) -> DynamicResult<Schematic> {
+pub fn apply(cue_policy_file: &Path, cue_bin: &Path, sch: Schematic) -> DynamicResult<Schematic> {
     // Write the in-binary policy schema file to a temporary directory
     let tmp_dir = tempdir()?;
     let mut m = HashMap::new();
@@ -58,7 +58,7 @@ pub fn apply(cue_policy_file: &Path, sch: Schematic) -> DynamicResult<Schematic>
 
     // Execute the given policy file using CUE and decode the resulting YAML ComponentClassifier list
     // This will use the first, classification part of the given CUE file
-    let c = Command::new("cue")
+    let c = Command::new(cue_bin)
         .arg("export")
         .arg(&m.get(CUE_POLICY_SCHEMA_FILE).unwrap())
         .arg(cue_policy_file)
@@ -94,12 +94,11 @@ pub fn apply(cue_policy_file: &Path, sch: Schematic) -> DynamicResult<Schematic>
 
     // Assemble the CUE command that will apply the policy of the given cue_policy_file
     let cmd = format!(
-        "cue export --out=yaml {} {} yaml: - | cue export --out=yaml {} yaml: -",
-        cue_policy_file
-            .as_os_str()
-            .to_str()
-            .ok_or("couldn't get policy file path")?,
+        "{} export --out=yaml {} {} yaml: - | {} export --out=yaml {} yaml: -",
+        cue_bin.display(),
+        cue_policy_file.display(),
         m.get(CUE_MAP_FILE).unwrap(),
+        cue_bin.display(),
         m.get(CUE_REDUCE_FILE).unwrap(),
     );
 

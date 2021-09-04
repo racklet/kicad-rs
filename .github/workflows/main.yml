@@ -1,0 +1,29 @@
+name: Test
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+jobs:
+  test:
+    name: Unit test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Rust
+      run: rustup update stable && rustup default stable && rustup component add rustfmt
+    - name: Install Cue and show the help text
+      run: GO111MODULE=on go get cuelang.org/go/cmd/cue && $(go env GOPATH)/bin/cue
+    - name: Verify Rust code compiles
+      run: cargo check
+    - name: Verify rustfmt
+      run: cargo fmt -- --check
+    - name: Run the evaluator for testdata/test.sch
+      run: cargo run --quiet --bin=evaluator testdata/test.sch
+    - name: Verify the parsed and classified YAML matches testdata/test.yaml
+      run: |
+        cargo run --quiet --bin=parser testdata/test.sch | \
+        cargo run --quiet --bin=classifier testdata/test.cue $(go env GOPATH)/bin/cue > testdata/test.yaml
+    - name: Verify the working tree is clean, or output the diff and exit
+      # As per https://unix.stackexchange.com/questions/155046/determine-if-git-working-directory-is-clean-from-a-script
+      run: git diff --exit-code

@@ -1,0 +1,159 @@
+---
+components:
+  C2:
+    attributes:
+      Value:
+        comment: "This is a capacitor :D!"
+        expression: C3*100
+        type: String
+        unit: F
+        value: 5.1 kF
+    classes:
+      - capacitor
+    labels:
+      footprintLibrary: Capacitor_SMD
+      footprintName: C_1206_3216Metric
+      reference: C2
+      symbolLibrary: Device
+      symbolName: C_Small
+  C3:
+    attributes:
+      Value:
+        comment: "This is a capacitor :D!"
+        expression: Properties.Globals.TargetVoltage * 10
+        type: Float
+        value: 51.0
+      voltagerating:
+        comment: Must be at least as large as the input voltage
+        expression: "35"
+        type: String
+        unit: V
+        value: 35 V
+    classes:
+      - capacitor
+    labels:
+      footprintLibrary: Capacitor_SMD
+      footprintName: C_0603_1608Metric
+      reference: C3
+      symbolLibrary: Device
+      symbolName: C_Small
+  C?:
+    attributes:
+      Value:
+        comment: "This is a capacitor :D!"
+        expression: "0.1"
+        type: Float
+        value: 0.1
+    classes:
+      - capacitor
+    labels:
+      footprintLibrary: Capacitor_SMD
+      footprintName: C_0603_1608Metric
+      reference: C?
+      symbolLibrary: Device
+      symbolName: C_Small
+  L2:
+    attributes:
+      Value:
+        expression: "8.2"
+        type: Float
+        value: 8.2
+    labels:
+      datasheet: "https://media.digikey.com/pdf/Data%20Sheets/Murata%20PDFs/DEMO80(30,40,45)C%20Type.pdf"
+      footprintLibrary: racklet
+      footprintName: DEM8045C
+      reference: L2
+      symbolLibrary: Device
+      symbolName: L
+  R6:
+    attributes:
+      Value:
+        expression: 16.2/2
+        type: Float
+        value: 8.1
+      tolerance:
+        expression: R7.Value/500.0
+        type: Float
+        value: 1.1
+    classes:
+      - resistor
+    labels:
+      footprintLibrary: Resistor_SMD
+      footprintName: R_0603_1608Metric
+      reference: R6
+      symbolLibrary: Device
+      symbolName: R_Small
+  R7:
+    attributes:
+      Value:
+        expression: "549"
+        type: Float
+        value: 549.0
+    labels:
+      footprintLibrary: Resistor_SMD
+      footprintName: R_0603_1608Metric
+      reference: R7
+      symbolLibrary: Device
+      symbolName: R_Small
+  R?:
+    attributes:
+      Value:
+        expression: "102"
+        type: Float
+        value: 102.0
+    labels:
+      footprintLibrary: Resistor_SMD
+      footprintName: R_0603_1608Metric
+      reference: R?
+      symbolLibrary: Device
+      symbolName: R_Small
+  U?:
+    attributes:
+      currentOutput_min:
+        expression: "3"
+        type: Float
+        value: 3.0
+      max_vin_min:
+        expression: "24"
+        type: String
+        value: ""
+      min_vin_max:
+        expression: "12"
+        type: String
+        value: ""
+    labels:
+      datasheet: "https://fscdn.rohm.com/en/products/databook/datasheet/ic/power/switching_regulator/bd9e302efj-e.pdf"
+      footprintLibrary: Package_SO
+      footprintName: HTSOP-8-1EP_3.9x4.9mm_P1.27mm_EP2.4x3.2mm_ThermalVias
+      model: BD9E302EFJ-E2
+      reference: U?
+      symbolLibrary: racklet
+      symbolName: BD9E302EFJ-E2
+meta:
+  comments:
+    - "https://racklet.io"
+    - "https://github.com/racklet/racklet"
+    - "https://github.com/racklet/racklet"
+    - "Author: Verneri Hirvonen"
+  company: Racklet
+  date: 2021-06-13
+  filename: testdata/test.sch
+  revision: 0.1.1
+  title: Compute unit HAT attachment
+subSchematics:
+  Properties_BD9E302EFJ_5V1:
+    components:
+      Globals:
+        attributes:
+          TargetVoltage:
+            expression: "5.1"
+            type: Float
+            value: 5.1
+        labels:
+          footprintLibrary: Resistor_SMD
+          footprintName: R_0603_1608Metric
+          reference: Globals
+          symbolLibrary: Device
+          symbolName: R
+    meta:
+      filename: testdata/Properties.sch
