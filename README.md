@@ -1,8 +1,24 @@
 # kicad-rs
 
+`kicad-rs` is a set of UNIX-style command line tools that automate some otherwise mundane tasks when working with KiCad schematic files (those ending with `.sch`). We like to think about this project as a way of doing "declarative electronics".
+
+For example, sometimes, if you change one component's value (of some attribute) in your schematic, suddenly a lot of other values need changing as well, creating a "snowball effect". Instead, `kicad-rs` allows you to parameterize all your component's values in the schematics, and dynamically re-calculate them based on your rules by just executing a command.
+
+Further, it allows for "unit testing" your schematics, by parsing the schematic data into a YAML file with a schema a bit easier (higher-level) to look at than the schematic text itself. When updating the schematic "source of truth" you can also see the change of the component values in the auto-generated YAML file.
+
+Finally, it is possible to apply policy to your schematics, i.e. that all resistors in a given projects should have a tolerance of 5% or less. Eventually, we'd like to be able to generate BoM (Bill of Materials) documents in Markdown, aggregating information on what to buy in one page, and possibly even have the automation order the right components from a electronic parts vendor.
+
 ## Sample usage
 
 ### Evaluator
+
+The evaluator reads a KiCad schematic file, parses all equations in the schematic, resolves dependencies between component values, and finally calculates and updates the presented component values in the schematic. The schematic file is updated in place.
+
+> **Note**: Make sure you have saved the schematic file before running this command, and maybe even, as a safety measure, closed KiCad operating on the given file. This to avoid race conditions and lost data if two parties would be reading and writing the same data.
+
+In order to make a certain component value automatically calculated, double-click the component in KiCad. A dialog called "Symbol properties" should pop up, allowing you to edit name-value fields. If the component is e.g. a resistor called `R1`, and you would like to make its primary value (i.e. resistance) twice as large as another resistor `R2`'s resistance, add a new field called `Value_expr` and write `R2*2`.
+
+After executing the evaluator like below, the `Value` field of `R1` should be twice as that of `R2`.
 
 - Reads from Stdin: No
 - Writes to Stdout: No
@@ -17,6 +33,8 @@ cargo run --bin=evaluator testdata/test.sch
 ```
 
 ### Parser
+
+The parser parses a KiCad schematic file into a YAML representation that focuses on key metadata about the schematic and its components (see `testdata/test.yaml` for an example). The YAML file can e.g. be used for "unit testing" that the schematic is as expected (take a look at `.github/workflows/main.yml` for an example of this). The YAML data can also be further processed, e.g. as input to the classifier binary below.
 
 - Reads from Stdin: No
 - Writes to Stdout: Yes
@@ -33,6 +51,10 @@ cargo run --bin=parser testdata/test.sch > parsed.yaml
 
 ### Classifier
 
+The classifier is used for classifying components into groups, e.g. all components with a `symbolName: C_Small` or `footprintLibrary: Capacitor_SMD` shall belong to the class `capacitor`. And for example, `capacitor`s with a `Value` (i.e. capacitance) less than `100nF` shall be also belong to the class `small_capacitor`. These rules are written using [CUE] in the `#Classifiers` sub-object (see `testdata/test.cue` for an example).
+
+Further, after classification, one can apply policy, that is, a set of rules, on components belonging to a given class. For example, you might want to enforce the tolerance of all your resistors to be less than 5%, or to enforce a temperature rating attribute for all your capacitors. These rules are written using [CUE] in the `#Policy` sub-object (see `testdata/test.cue` for an example).
+
 > **Important**: Before you use the classifier, make sure to [install CUE].
 > If you have Go installed, run:
 >
@@ -40,6 +62,7 @@ cargo run --bin=parser testdata/test.sch > parsed.yaml
 > GO111MODULE=on go get cuelang.org/go/cmd/cue
 > ```
 
+[CUE]: https://cuelang.org
 [install CUE]: https://cuelang.org/docs/install/
 
 - Reads from Stdin: Yes
