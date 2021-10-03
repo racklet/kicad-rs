@@ -11,9 +11,3 @@
 *.stl filter=lfs diff=lfs merge=lfs -text
 *.step filter=lfs diff=lfs merge=lfs -text
 *.FCStd* filter=lfs diff=lfs merge=lfs -text
-
-# Schematics (KiCad)
-*.kicad_pcb filter=lfs diff=lfs merge=lfs -text
-*.pro filter=lfs diff=lfs merge=lfs -text
-*.lib filter=lfs diff=lfs merge=lfs -text
-*.dcm filter=lfs diff=lfs merge=lfs -text
