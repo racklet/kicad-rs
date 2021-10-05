@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name racklet)(type Legacy)(uri ${KIPRJMOD}/racklet-kicad-lib/racklet.lib)(options "")(descr ""))
+)

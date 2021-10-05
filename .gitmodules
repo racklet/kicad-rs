@@ -1,0 +1,3 @@
+[submodule "testdata/racklet-kicad-lib"]
+	path = testdata/racklet-kicad-lib
+	url = git@github.com:racklet/racklet-kicad-lib.git

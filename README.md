@@ -10,6 +10,8 @@ Finally, it is possible to apply policy to your schematics, i.e. that all resist
 
 ## Sample usage
 
+Clone this repository with the `--recurse-submodules` flag in order to also pull in the KiCad symbol library used for the exmaple schematic. Alternatively, if you have already cloned the repository you can run `git submodule update --init --recursive` to clone the submodules.
+
 ### Evaluator
 
 The evaluator reads a KiCad schematic file, parses all equations in the schematic, resolves dependencies between component values, and finally calculates and updates the presented component values in the schematic. The schematic file is updated in place.
