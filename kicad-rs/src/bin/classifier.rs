@@ -5,6 +5,7 @@ use kicad_rs::policy;
 use kicad_rs::types::Schematic;
 use std::io;
 use std::path::Path;
+use std::process::Command;
 
 // Get crate version information from Cargo
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
@@ -35,6 +36,12 @@ fn main() -> DynamicResult<()> {
     // wasn't required we could have used an 'if let' to conditionally get the value)
     let policy_path = Path::new(matches.value_of("CUE_POLICY").unwrap());
     let cue_path = Path::new(matches.value_of("CUE_BIN").unwrap());
+
+    // Check if the cue binary can be executed from the given path
+    Command::new(cue_path)
+        .output()
+        .expect(format!("Could not execute cue with the invocation: '{}'. \
+            Install cue before attempting to run this program.", cue_path.display()).as_str());
 
     // Apply the policy in the given file
     let processed_sch = policy::apply(&policy_path, &cue_path, sch)?;
