@@ -1,5 +1,21 @@
 ---
 components:
+  C1:
+    attributes:
+      Value:
+        comment: "This is a capacitor :D!"
+        expression: "0.1e-6"
+        type: String
+        unit: F
+        value: 100 nF
+    classes:
+      - capacitor
+    labels:
+      footprintLibrary: Capacitor_SMD
+      footprintName: C_0603_1608Metric
+      reference: C1
+      symbolLibrary: Device
+      symbolName: C_Small
   C2:
     attributes:
       Value:
@@ -21,8 +37,9 @@ components:
       Value:
         comment: "This is a capacitor :D!"
         expression: Properties.Globals.TargetVoltage * 10
-        type: Float
-        value: 51.0
+        type: String
+        unit: F
+        value: 51 F
       voltagerating:
         comment: Must be at least as large as the input voltage
         expression: "35"
@@ -37,27 +54,60 @@ components:
       reference: C3
       symbolLibrary: Device
       symbolName: C_Small
-  C?:
+  C4:
     attributes:
       Value:
         comment: "This is a capacitor :D!"
-        expression: "0.1"
-        type: Float
-        value: 0.1
+        expression: "5600e-12"
+        type: String
+        unit: F
+        value: 5.6 nF
     classes:
       - capacitor
     labels:
       footprintLibrary: Capacitor_SMD
       footprintName: C_0603_1608Metric
-      reference: C?
+      reference: C4
+      symbolLibrary: Device
+      symbolName: C_Small
+  C5:
+    attributes:
+      Value:
+        comment: "This is a capacitor :D!"
+        expression: "47e-6"
+        type: String
+        unit: F
+        value: 47 µF
+    classes:
+      - capacitor
+    labels:
+      footprintLibrary: Capacitor_SMD
+      footprintName: C_1206_3216Metric
+      reference: C5
+      symbolLibrary: Device
+      symbolName: C_Small
+  C6:
+    attributes:
+      Value:
+        comment: "This is a capacitor :D!"
+        expression: "15e-12"
+        type: String
+        value: 15p
+    classes:
+      - capacitor
+    labels:
+      footprintLibrary: Capacitor_SMD
+      footprintName: C_0603_1608Metric
+      reference: C6
       symbolLibrary: Device
       symbolName: C_Small
   L2:
     attributes:
       Value:
-        expression: "8.2"
-        type: Float
-        value: 8.2
+        expression: "8.2e-6"
+        type: String
+        unit: H
+        value: 8.2 µH
     labels:
       datasheet: "https://media.digikey.com/pdf/Data%20Sheets/Murata%20PDFs/DEMO80(30,40,45)C%20Type.pdf"
       footprintLibrary: racklet
@@ -65,18 +115,30 @@ components:
       reference: L2
       symbolLibrary: Device
       symbolName: L
+  R1:
+    attributes:
+      Value:
+        expression: "102e3"
+        type: String
+        unit: Ohm
+        value: 102 kOhm
+    labels:
+      footprintLibrary: Resistor_SMD
+      footprintName: R_0603_1608Metric
+      reference: R1
+      symbolLibrary: Device
+      symbolName: R_Small
   R6:
     attributes:
       Value:
-        expression: 16.2/2
-        type: Float
-        value: 8.1
+        expression: 16.2e3/2
+        type: String
+        unit: Ohm
+        value: 8.1 kOhm
       tolerance:
         expression: R7.Value/500.0
-        type: Float
-        value: 1.1
-    classes:
-      - resistor
+        type: String
+        value: 1.1k
     labels:
       footprintLibrary: Resistor_SMD
       footprintName: R_0603_1608Metric
@@ -86,28 +148,17 @@ components:
   R7:
     attributes:
       Value:
-        expression: "549"
-        type: Float
-        value: 549.0
+        expression: "549e3"
+        type: String
+        unit: Ohm
+        value: 549 kOhm
     labels:
       footprintLibrary: Resistor_SMD
       footprintName: R_0603_1608Metric
       reference: R7
       symbolLibrary: Device
       symbolName: R_Small
-  R?:
-    attributes:
-      Value:
-        expression: "102"
-        type: Float
-        value: 102.0
-    labels:
-      footprintLibrary: Resistor_SMD
-      footprintName: R_0603_1608Metric
-      reference: R?
-      symbolLibrary: Device
-      symbolName: R_Small
-  U?:
+  U1:
     attributes:
       currentOutput_min:
         expression: "3"
@@ -126,7 +177,7 @@ components:
       footprintLibrary: Package_SO
       footprintName: HTSOP-8-1EP_3.9x4.9mm_P1.27mm_EP2.4x3.2mm_ThermalVias
       model: BD9E302EFJ-E2
-      reference: U?
+      reference: U1
       symbolLibrary: racklet
       symbolName: BD9E302EFJ-E2
 meta:

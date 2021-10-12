@@ -356,7 +356,7 @@ Connection ~ 6250 3600
 Wire Wire Line
 	6250 3600 6550 3600
 $Sheet
-S 2950 2600 500  150 
+S 2950 2600 500 150
 U 60FFED3D
 F0 "Properties_BD9E302EFJ_5V1" 50
 F1 "Properties.sch" 50
