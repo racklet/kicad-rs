@@ -188,7 +188,7 @@ meta:
     - "Author: Verneri Hirvonen"
   company: Racklet
   date: 2021-06-13
-  filename: test.sch
+  filename: testdata/test.sch
   revision: 0.1.1
   title: Compute unit HAT attachment
 subSchematics:
@@ -207,4 +207,4 @@ subSchematics:
           symbolLibrary: Device
           symbolName: R
     meta:
-      filename: Properties.sch
+      filename: testdata/Properties.sch
