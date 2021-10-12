@@ -38,10 +38,14 @@ fn main() -> DynamicResult<()> {
     let cue_path = Path::new(matches.value_of("CUE_BIN").unwrap());
 
     // Check if the cue binary can be executed from the given path
-    Command::new(cue_path)
-        .output()
-        .expect(format!("Could not execute cue with the invocation: '{}'. \
-            Install cue before attempting to run this program.", cue_path.display()).as_str());
+    Command::new(cue_path).output().expect(
+        format!(
+            "Could not execute cue with the invocation: '{}'. \
+            Install cue before attempting to run this program.",
+            cue_path.display()
+        )
+        .as_str(),
+    );
 
     // Apply the policy in the given file
     let processed_sch = policy::apply(&policy_path, &cue_path, sch)?;
