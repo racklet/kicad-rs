@@ -1,18 +1,17 @@
 use clap::{App, Arg};
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Error, Method, Request, Response, Server};
 use kicad_rs::error::DynamicResult;
 use reqwest::Client;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server};
-use hyper::{Method, StatusCode};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{convert::Infallible, net::SocketAddr};
-use url::form_urlencoded;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
 #[tokio::main]
 async fn main() -> DynamicResult<()> {
-
     // Parse command line arguments
     let matches = App::new("DigiKey API Client Helper")
         .about("Helper for fetching OAuth 2.0 tokens from DigiKey authorization server")
@@ -25,29 +24,75 @@ async fn main() -> DynamicResult<()> {
                 .required(true),
         )
         .arg(
+            Arg::with_name("CLIENT_SECRET")
+                .help("Digi-Key App Client Secret")
+                .required(true),
+        )
+        .arg(
             Arg::with_name("REDIRECT_URI")
                 .help("OAuth 2.0 Callback URL")
-                .default_value("http://localhost"),
+                .default_value("http://localhost:8080"),
         )
         .get_matches();
 
-    let code = get_auth_code(
+    // Prompt for user to login to Digi-Key and authorize this application
+    let auth_code = get_auth_code(
         matches.value_of("CLIENT_ID").unwrap(),
         matches.value_of("REDIRECT_URI").unwrap(),
     )
-    .await.unwrap();
+    .await
+    .unwrap();
+
+    // Use received authorization code to request OAuth tokens
+    let tokens = get_tokens(
+        matches.value_of("CLIENT_ID").unwrap(),
+        matches.value_of("CLIENT_SECRET").unwrap(),
+        matches.value_of("REDIRECT_URI").unwrap(),
+        &auth_code,
+    )
+    .await
+    .unwrap();
+
+    println!("Received tokens: {:#?}", tokens);
 
     Ok(())
 }
 
-async fn get_auth_code(client_id: &str, redirect_uri: &str) -> DynamicResult<String> {
-    // Start local http server for receiving auth code over a redirect
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-    let make_svc = make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(handle_auth_code)) });
-    let server = Server::bind(&addr).serve(make_svc);
+/// Start a local http server for receiving auth code over a redirect
+async fn code_rx_task(tx: Sender<Result<String, ()>>) {
+    let addr: SocketAddr = "127.0.0.1:8080"
+        .parse()
+        .expect("Could not parse socket address");
+    let make_service = make_service_fn(move |_| {
+        let tx = tx.clone();
+        async move {
+            Ok::<_, Infallible>(service_fn(move |req| {
+                let tx = tx.clone();
+                async move {
+                    if req.method() == &Method::GET && req.uri().path() == "/" {
+                        let params = get_query_params(&req);
+                        if let Some(code) = params.get("code") {
+                            tx.send(Ok(code.clone())).await.unwrap();
+                        };
+                    }
+
+                    Ok::<_, Error>(Response::new(Body::from("")))
+                }
+            }))
+        }
+    });
+
+    println!("Listening on: {:?}", addr);
+    let server = Server::bind(&addr).serve(make_service);
     if let Err(e) = server.await {
         eprintln!("server error: {}", e);
     }
+}
+
+async fn get_auth_code(client_id: &str, redirect_uri: &str) -> DynamicResult<String> {
+    // start local http server for receiving auth code over redirect
+    let (tx, mut rx) = mpsc::channel::<Result<String, ()>>(1);
+    let code_rx_task_handle = tokio::spawn(code_rx_task(tx));
 
     // build authentication request url
     let auth_endpoint = "https://sandbox-api.digikey.com/v1/oauth2/authorize";
@@ -64,7 +109,19 @@ async fn get_auth_code(client_id: &str, redirect_uri: &str) -> DynamicResult<Str
 
     webbrowser::open(auth_url.as_str())?;
 
-    Ok(String::new())
+    let code = rx.recv().await.unwrap().unwrap();
+
+    Ok(code)
+}
+
+/// Response from digikey Digi-Key API endpoint: https://sandbox-api.digikey.com/v1/oauth2/token
+#[derive(Debug, Serialize, Deserialize)]
+struct OAuthTokens {
+    access_token: String,
+    refresh_token: String,
+    expires_in: usize,
+    refresh_token_expires_in: usize,
+    token_type: String,
 }
 
 /// Get access and refresh tokens from the token API endpoint
@@ -73,7 +130,7 @@ async fn get_tokens(
     client_secret: &str,
     redirect_uri: &str,
     auth_code: &str,
-) -> DynamicResult<(String, String)> {
+) -> DynamicResult<OAuthTokens> {
     let token_endpoint = "https://sandbox-api.digikey.com/v1/oauth2/token";
     let request = Client::new().post(token_endpoint).form(&[
         ("code", auth_code),
@@ -83,11 +140,11 @@ async fn get_tokens(
         ("grant_type", "authorization_code"),
     ]);
 
-    let resp = request.send().await?;
-    println!("{:#?}", resp);
-    println!("{:#?}", resp.text().await?);
+    let response = request.send().await?;
+    let response_text = response.text().await?;
+    let tokens = serde_json::from_str(&response_text)?;
 
-    Ok((String::from("a"), String::from("b")))
+    Ok(tokens)
 }
 
 fn get_query_params(request: &Request<Body>) -> HashMap<String, String> {
@@ -100,22 +157,4 @@ fn get_query_params(request: &Request<Body>) -> HashMap<String, String> {
                 .collect()
         })
         .unwrap_or_else(HashMap::new)
-}
-
-async fn handle_auth_code(request: Request<Body>) -> Result<Response<Body>, Infallible> {
-    
-    let mut response = Response::new(Body::empty());
-    match (request.method(), request.uri().path()) {
-        (&Method::GET, "/") => {
-            let params = get_query_params(&request);
-
-            println!("Got a request!! {:#?}", request);
-            println!("Query params: {:#?}", params);
-        },
-        _ => {
-            *response.body_mut() = Body::from("Could not authenticate application");
-        }
-    }
-
-    Ok(response)
 }
