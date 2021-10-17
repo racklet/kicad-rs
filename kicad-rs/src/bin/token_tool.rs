@@ -13,8 +13,8 @@ const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 #[tokio::main]
 async fn main() -> DynamicResult<()> {
     // Parse command line arguments
-    let matches = App::new("DigiKey API Client Helper")
-        .about("Helper for fetching OAuth 2.0 tokens from DigiKey authorization server")
+    let matches = App::new("DigiKey API Token Helper")
+        .about("Helper for fetching OAuth 2.0 tokens from DigiKey authorization servers")
         .author("Verneri Hirvonen (@chiplet), The Racklet Project")
         .version(VERSION.unwrap_or("unknown"))
         .version_short("v")

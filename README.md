@@ -83,6 +83,14 @@ cat parsed.yaml | cargo run --bin=classifier testdata/test.cue > classified.yaml
 cargo run --bin=parser testdata/test.sch | cargo run --bin=classifier testdata/test.cue
 ```
 
+### Digikey API Token Helper
+
+Digi-Key API uses OAuth 2.0 for authorization. The `token_helper` binary is a helper for requesting the OAuth 2.0 refresh token for a third party application. These tokens are required for using the Digi-Key search API to automatically search for available components. The `<CLIENT_ID>` and `<CLIENT_SECRET>` fields should be replaced by the values that correspond to [your application](https://developer.digikey.com/documentation/developer).
+
+```bash
+cargo run --bin=token_helper <CLIENT_ID> <CLIENT_SECRET>
+```
+
 ## Contributing
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code Of Conduct](CODE_OF_CONDUCT.md).
